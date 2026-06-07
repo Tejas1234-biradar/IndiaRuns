@@ -5,6 +5,17 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add contributing guide
+
+### What changed
+- Created `CONTRIBUTING.md` guide
+
+### Why
+Created the contributing guide to document the atomic commit requirements and changelog maintenance rules. This ensures that all team members adhere to the same engineering workflow and repository standards from day one.
+
+### Scope
+ci
+
 ## [2026-06-07] — add PR template
 
 ### What changed
