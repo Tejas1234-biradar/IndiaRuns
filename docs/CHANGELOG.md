@@ -5,6 +5,18 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add offline and runtime requirements files
+
+### What changed
+- Created `requirements_offline.txt` containing dependencies for offline model training/indexing
+- Created `requirements_runtime.txt` containing lightweight dependencies for runtime sandbox evaluation
+
+### Why
+Intentionally split dependencies into offline and runtime requirements. Offline dependencies (such as heavy API clients and deep learning libraries) cannot run in the resource-constrained Docker sandbox, whereas runtime dependencies are kept CPU-only and lightweight to comply with sandbox execution constraints.
+
+### Scope
+deps
+
 ## [2026-06-07] — add Dockerfile stub
 
 ### What changed

@@ -1,0 +1,9 @@
+anthropic
+openai
+faiss-cpu
+sentence-transformers
+xgboost
+shap
+pandas
+numpy
+scikit-learn
