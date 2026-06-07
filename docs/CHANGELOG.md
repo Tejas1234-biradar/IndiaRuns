@@ -5,6 +5,18 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add Dockerfile stub
+
+### What changed
+- Created `docker/` directory
+- Added `docker/Dockerfile` using python:3.11-slim
+
+### Why
+Created the Dockerfile for containerization. It uses python:3.11-slim to keep the image size small for the sandbox environment, and intentionally only installs the runtime dependencies to optimize the build.
+
+### Scope
+docker
+
 ## [2026-06-07] — add rank.py entrypoint stub
 
 ### What changed
