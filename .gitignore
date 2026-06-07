@@ -1,0 +1,10 @@
+artifacts/*.bin
+artifacts/*.pkl
+artifacts/*.xgb
+data/
+*.jsonl
+*.jsonl.gz
+__pycache__/
+*.pyc
+.env
+.venv/
