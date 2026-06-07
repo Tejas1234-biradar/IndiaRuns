@@ -5,6 +5,17 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add architecture stub
+
+### What changed
+- Created `docs/architecture.md` placeholder
+
+### Why
+Created the architecture document stub. This will serve as a central reference to be filled in once the Phase 1 offline and Phase 2 runtime pipeline implementations are finalized.
+
+### Scope
+docs
+
 ## [2026-06-07] — add contributing guide
 
 ### What changed
