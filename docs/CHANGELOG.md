@@ -5,6 +5,17 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — write project README
+
+### What changed
+- Created `README.md` at the root of the repository
+
+### Why
+Created the project README file last so that all internal links and references to other components, requirements, and guides are fully valid and verifyable at the time of commit.
+
+### Scope
+docs
+
 ## [2026-06-07] — add architecture stub
 
 ### What changed
