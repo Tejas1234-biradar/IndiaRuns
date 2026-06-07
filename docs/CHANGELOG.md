@@ -5,6 +5,18 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add PR template
+
+### What changed
+- Created `.github/` directory
+- Added `.github/PULL_REQUEST_TEMPLATE.md`
+
+### Why
+Created the pull request template to enforce the hackathon's key constraints (preventing binary artifacts/data files from being committed, and ensuring rank.py runs correctly in the Docker sandbox) for all future contributions.
+
+### Scope
+ci
+
 ## [2026-06-07] — add offline and runtime requirements files
 
 ### What changed
