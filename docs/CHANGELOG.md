@@ -5,6 +5,17 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add rank.py entrypoint stub
+
+### What changed
+- Created `runtime_pipeline/rank.py` with runtime entrypoint structure
+
+### Why
+Created rank.py, which serves as the sole submission entrypoint for the candidate ranking pipeline. It must remain self-contained and run without external network calls or GPU access, satisfying the strict time limits of the evaluation environment.
+
+### Scope
+runtime
+
 ## [2026-06-07] — add placeholder test stubs
 
 ### What changed
