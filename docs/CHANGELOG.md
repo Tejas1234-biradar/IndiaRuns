@@ -5,6 +5,19 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — scaffold pipeline and artifact directories
+
+### What changed
+- Created `offline_pipeline/` with subdirectories `jd_decoder/`, `semantic_indexer/`, `feature_engineering/`, and `teacher_student/`
+- Created `runtime_pipeline/utils/` subdirectory
+- Created `artifacts/` and `data/` directories with `.gitkeep` files
+
+### Why
+Scaffolded the initial directory structure. The four offline pipeline subdirectories map to the four phases of the offline pipeline (JD decode, embed, feature eng, train).
+
+### Scope
+Repo Infrastructure
+
 ## [2026-06-07] — add gitignore
 
 ### What changed
