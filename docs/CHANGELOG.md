@@ -5,6 +5,18 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-07] — add placeholder test stubs
+
+### What changed
+- Created `tests/` directory
+- Added test placeholder stubs: `test_honeypot.py`, `test_faiss_recall.py`, and `test_xgb_ranker.py`
+
+### Why
+Created placeholder test files for unit testing. These stubs will be filled in with actual test cases as each pipeline component is implemented.
+
+### Scope
+tests
+
 ## [2026-06-07] — scaffold pipeline and artifact directories
 
 ### What changed
