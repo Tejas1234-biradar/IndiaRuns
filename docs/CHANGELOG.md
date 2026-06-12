@@ -5,6 +5,24 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-12] — add high-throughput candidate stream parser (Task 2.1)
+
+### What changed
+- Created offline_pipeline/feature_engineering/parse_candidates.py
+
+### Why
+Built a streaming parser for the 100K candidate dataset (candidates.jsonl) that never
+loads the full file into memory. Uses orjson for parsing after benchmarking three
+libraries (orjson 2.15× faster than stdlib json, ijson too slow for line-by-line JSONL).
+Normalizes all nested candidate structures (profile, career_history, education, skills,
+redrob_signals) into flat records and exports artifacts/candidates_parsed.jsonl for
+consumption by M1 (embeddings) and M3 (feature matrix). Validated against all 50 known
+sample candidates — 600 field checks, 0 errors. Peak memory 0.2 MB confirms the
+streaming design holds under full dataset load.
+
+### Scope
+parser
+
 ## [2026-06-07] — write project README
 
 ### What changed
