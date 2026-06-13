@@ -12,4 +12,4 @@ COPY runtime_pipeline/ ./runtime_pipeline/
 COPY tests/ ./tests/
 
 # Default entrypoint
-CMD ["python", "rank.py"]
+ENTRYPOINT ["python", "rank.py"]
