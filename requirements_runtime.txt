@@ -3,3 +3,4 @@ xgboost
 shap
 numpy
 pandas
+orjson
