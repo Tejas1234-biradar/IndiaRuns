@@ -156,3 +156,109 @@ RULES = [
 ]
 
 HONEYPOT_FLAG_THRESHOLD = 3
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 2 — Scanner main loop
+# ─────────────────────────────────────────────────────────────────────────────
+
+def scan_candidates(parsed_path: str) -> tuple[set, list, dict, int]:
+    """
+    Stream through candidates_parsed.jsonl and apply all 5 rules to each record.
+
+    Returns:
+        honeypot_ids  — set of confirmed candidate_id strings
+        audit_trail   — list of dicts for all candidates with flag_count >= 1
+        rule_stats    — per-rule firing counts across all 100K candidates
+        total         — total records scanned
+    """
+    print(f"\n[SCANNER] Reading {parsed_path} …")
+
+    honeypot_ids = set()
+    audit_trail  = []
+    rule_stats   = {name: 0 for name, _ in RULES}
+    total        = 0
+    flag_dist    = {}
+
+    with open(parsed_path, "rb") as fh:
+        for raw_line in fh:
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+
+            rec   = orjson.loads(raw_line)
+            total += 1
+
+            fired_rules   = []
+            fired_details = []
+
+            for rule_name, rule_fn in RULES:
+                fired, detail = rule_fn(rec)
+                if fired:
+                    fired_rules.append(rule_name)
+                    fired_details.append(detail)
+                    rule_stats[rule_name] += 1
+
+            flag_count = len(fired_rules)
+            flag_dist[flag_count] = flag_dist.get(flag_count, 0) + 1
+
+            if flag_count >= HONEYPOT_FLAG_THRESHOLD:
+                honeypot_ids.add(rec["candidate_id"])
+
+            if flag_count >= 1:
+                audit_trail.append({
+                    "candidate_id":           rec["candidate_id"],
+                    "flag_count":             flag_count,
+                    "is_honeypot":            flag_count >= HONEYPOT_FLAG_THRESHOLD,
+                    "rules_fired":            fired_rules,
+                    "rule_details":           fired_details,
+                    "years_exp":              rec["years_of_experience"],
+                    "profile_completeness":   rec["profile_completeness"],
+                    "adv_skills_count":       rec["adv_skills_count"],
+                    "salary_min":             rec["salary_min_lpa"],
+                    "salary_max":             rec["salary_max_lpa"],
+                    "offer_accept_rate":      rec["offer_accept_rate"],
+                    "zero_dur_expert_skills": rec.get("zero_dur_expert_skills", 0),
+                })
+
+    audit_trail.sort(key=lambda x: (-x["flag_count"], x["candidate_id"]))
+
+    print(f"  Scanned:                {total:,} candidates")
+    print(f"  Honeypots (≥{HONEYPOT_FLAG_THRESHOLD} flags):   {len(honeypot_ids)}")
+    print(f"  Suspicious (1-2 flags): "
+          f"{sum(v for k,v in flag_dist.items() if 1 <= k < HONEYPOT_FLAG_THRESHOLD)}")
+    print(f"\n  Flag count distribution:")
+    for k in sorted(flag_dist):
+        label = "← confirmed honeypots" if k >= HONEYPOT_FLAG_THRESHOLD else ""
+        print(f"    {k} flags: {flag_dist[k]:>7,} candidates  {label}")
+    print(f"\n  Per-rule firing counts:")
+    for rule_name, count in rule_stats.items():
+        pct = count / total * 100
+        print(f"    {rule_name:<45} {count:>7,}  ({pct:.2f}%)")
+
+    return honeypot_ids, audit_trail, rule_stats, total
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 3 — Export honeypot_ids.pkl
+# ─────────────────────────────────────────────────────────────────────────────
+
+def export_honeypot_ids(honeypot_ids: set, out_dir: str) -> str:
+    """
+    Serialize confirmed honeypot IDs to pickle.
+    Consumed by rank.py — any ID in this set is hard-zeroed before scoring.
+    Disqualification trigger: >10% honeypots in top-100 submission.
+    """
+    pkl_path = os.path.join(out_dir, "honeypot_ids.pkl")
+    with open(pkl_path, "wb") as fh:
+        pickle.dump(honeypot_ids, fh, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open(pkl_path, "rb") as fh:
+        loaded = pickle.load(fh)
+
+    assert loaded == honeypot_ids,  "Pickle round-trip verification failed"
+    assert all(isinstance(cid, str) for cid in loaded), "All IDs must be strings"
+    assert all(cid.startswith("CAND_") for cid in loaded), "All IDs must match CAND_ format"
+
+    print(f"\n[EXPORT]  honeypot_ids.pkl → {pkl_path}")
+    print(f"          {len(loaded)} IDs serialized and verified")
+    return pkl_path
