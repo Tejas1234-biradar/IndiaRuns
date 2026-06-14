@@ -262,3 +262,147 @@ def export_honeypot_ids(honeypot_ids: set, out_dir: str) -> str:
     print(f"\n[EXPORT]  honeypot_ids.pkl → {pkl_path}")
     print(f"          {len(loaded)} IDs serialized and verified")
     return pkl_path
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 4 — Report builders
+# ─────────────────────────────────────────────────────────────────────────────
+
+def build_report(
+    honeypot_ids:  set,
+    audit_trail:   list,
+    rule_stats:    dict,
+    total_scanned: int,
+) -> dict:
+    confirmed  = [e for e in audit_trail if e["is_honeypot"]]
+    suspicious = [e for e in audit_trail if not e["is_honeypot"]]
+    return {
+        "generated_at":       datetime.now(tz=timezone.utc).isoformat(),
+        "total_scanned":      total_scanned,
+        "honeypot_threshold": HONEYPOT_FLAG_THRESHOLD,
+        "rules_defined":      [name for name, _ in RULES],
+        "summary": {
+            "confirmed_honeypots":    len(honeypot_ids),
+            "confirmed_honeypot_pct": round(len(honeypot_ids) / total_scanned * 100, 4),
+            "suspicious_1_2_flags":   len(suspicious),
+            "suspicious_pct":         round(len(suspicious) / total_scanned * 100, 4),
+            "clean_candidates":       total_scanned - len(audit_trail),
+        },
+        "rule_firing_counts":    rule_stats,
+        "confirmed_honeypots":   confirmed,
+        "suspicious_candidates": suspicious,
+    }
+
+
+def save_report(report: dict, out_dir: str) -> str:
+    report_path = os.path.join(out_dir, "honeypot_report.json")
+    with open(report_path, "w", encoding="utf-8") as fh:
+        json.dump(report, fh, indent=2)
+    print(f"[REPORT]  honeypot_report.json → {report_path}")
+    return report_path
+
+
+def save_summary_txt(report: dict, out_dir: str) -> str:
+    s         = report["summary"]
+    rs        = report["rule_firing_counts"]
+    confirmed = report["confirmed_honeypots"]
+
+    lines = [
+        "Honeypot Detection Summary — Task 2.2",
+        f"Generated: {report['generated_at']}",
+        f"Dataset:   {report['total_scanned']:,} candidates scanned",
+        "",
+        "─" * 60,
+        "CONFIRMED HONEYPOTS",
+        "─" * 60,
+        f"  Count:      {s['confirmed_honeypots']}",
+        f"  Percentage: {s['confirmed_honeypot_pct']:.4f}% of dataset",
+        f"  Threshold:  >= {report['honeypot_threshold']} rules fired simultaneously",
+        "",
+        "─" * 60,
+        "RULE FIRING COUNTS (all 100K candidates)",
+        "─" * 60,
+    ]
+    for rule_name, count in rs.items():
+        pct = count / report["total_scanned"] * 100
+        lines.append(f"  {rule_name:<45} {count:>7,}  ({pct:.2f}%)")
+    lines += [
+        "",
+        "─" * 60,
+        "CONFIRMED HONEYPOT IDs",
+        "─" * 60,
+    ]
+    for entry in confirmed:
+        lines.append(
+            f"  {entry['candidate_id']}  "
+            f"flags={entry['flag_count']}  "
+            f"rules={entry['rules_fired']}"
+        )
+    lines += [
+        "",
+        "─" * 60,
+        "DOWNSTREAM USAGE",
+        "─" * 60,
+        "  artifacts/honeypot_ids.pkl is the blocklist for rank.py.",
+        "  Any candidate_id in this set is to be hard-zeroed before scoring.",
+        f"  Submitting any of these {s['confirmed_honeypots']} IDs in top-100",
+        "  means disqualification (spec limit: honeypot rate <= 10% in top 100).",
+    ]
+
+    txt_path = os.path.join(out_dir, "honeypot_summary.txt")
+    with open(txt_path, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines))
+    print(f"[SUMMARY] honeypot_summary.txt → {txt_path}")
+    return txt_path
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(description="Task 2.2 — Honeypot Detection Scanner")
+    parser.add_argument("--parsed",  default="artifacts/candidates_parsed.jsonl",
+                        help="Path to candidates_parsed.jsonl (Task 2.1 output)")
+    parser.add_argument("--out_dir", default="artifacts/",
+                        help="Directory to write output files")
+    args = parser.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    print("=" * 60)
+    print("Task 2.2 — Honeypot Detection Scanner")
+    print(f"Started: {datetime.now(tz=timezone.utc).isoformat()}")
+    print("=" * 60)
+
+    honeypot_ids, audit_trail, rule_stats, total_scanned = scan_candidates(args.parsed)
+    export_honeypot_ids(honeypot_ids, args.out_dir)
+    report = build_report(honeypot_ids, audit_trail, rule_stats, total_scanned)
+    save_report(report, args.out_dir)
+    save_summary_txt(report, args.out_dir)
+
+    s = report["summary"]
+    print("\n" + "=" * 60)
+    print("FINAL SUMMARY")
+    print("=" * 60)
+    print(f"  Scanned:              {total_scanned:,}")
+    print(f"  Confirmed honeypots:  {s['confirmed_honeypots']}  "
+          f"({s['confirmed_honeypot_pct']:.4f}%)")
+    print(f"  Suspicious (1-2 fl):  {s['suspicious_1_2_flags']:,}  "
+          f"({s['suspicious_pct']:.2f}%)")
+    print(f"  Clean candidates:     {s['clean_candidates']:,}")
+    print(f"\n  Outputs:")
+    print(f"    artifacts/honeypot_ids.pkl")
+    print(f"    artifacts/honeypot_report.json")
+    print(f"    artifacts/honeypot_summary.txt")
+    print("=" * 60)
+    print(f"\nTask 2.2 complete. {datetime.now(tz=timezone.utc).isoformat()}")
+
+    actual = s["confirmed_honeypots"]
+    if 60 <= actual <= 85:
+        print(f"\n✓ Honeypot count {actual} within expected range (spec says ~80).")
+    else:
+        print(f"\n⚠ WARNING: Count {actual} outside expected range 60–85.")
+
+
+if __name__ == "__main__":
+    main()
