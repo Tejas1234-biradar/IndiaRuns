@@ -5,6 +5,27 @@ Format: date, title, what changed, why, scope.
 
 ---
 
+## [2026-06-13] — add honeypot detection scanner (Task 2.2)
+
+### What changed
+- Created offline_pipeline/feature_engineering/detect_honeypots.py
+- Added unit tests in tests/test_honeypot.py
+
+### Why
+Built a rule-based scanner to identify the ~80 synthetic honeypot profiles
+embedded in the 100K dataset. Applies 5 signal-violation rules: salary
+inversion, low completeness with high advanced skills, salary inversion
+compounded with offer history, impossible job durations, and zero-duration
+expert skill clusters. Confirmed 65 honeypots at the 3-rule threshold.
+12 additional candidate rules were probed and rejected with quantitative
+justification — each fired on too many legitimate candidates to be
+honeypot-exclusive. Exports artifacts/honeypot_ids.pkl as the blocklist
+for rank.py — any ID in this set is hard-zeroed before scoring to prevent
+disqualification (spec limit: honeypot rate <= 10% in top 100).
+
+### Scope
+honeypot
+
 ## [2026-06-12] — add high-throughput candidate stream parser (Task 2.1)
 
 ### What changed
