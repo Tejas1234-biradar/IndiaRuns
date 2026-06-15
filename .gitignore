@@ -10,3 +10,4 @@ __pycache__/
 .venv/
 *.npy
 offline_pipeline/*.json
+*.csv
