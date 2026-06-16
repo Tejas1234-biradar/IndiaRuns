@@ -4,6 +4,18 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-16] — serialize index and add synthetic recall test
+
+### What changed
+- Added `faiss.write_index` serialization to `artifacts/faiss_index.bin`
+- Implemented an exact-match self-retrieval test
+
+### Why
+Serialized the C++ object to a binary file to satisfy the strict runtime constraints. `rank.py` will use `faiss.read_index()` to instantly load this artifact into memory, avoiding the compute penalty of dynamically injecting 100K vectors at runtime and keeping execution well under the 5-minute sandbox limit. The synthetic recall test guarantees the data structures remain perfectly aligned before deployment.
+
+### Scope
+indexer
+
 ## [2026-06-16] — add vectors to FAISS and implement ID mapping
 
 ### What changed
