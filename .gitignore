@@ -11,3 +11,5 @@ __pycache__/
 *.npy
 offline_pipeline/*.json
 *.csv
+"offline_pipeline/candidate_embeddings/*.json" 
+
