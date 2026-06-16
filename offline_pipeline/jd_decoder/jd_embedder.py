@@ -1,10 +1,14 @@
 import json
 import os
 import numpy as np
+import time
+import faiss
 from sentence_transformers import SentenceTransformer
 
 JD_CONFIG_PATH = "../../artifacts/jd_structured_config(2.5).json"
 JD_VECTOR_OUTPUT_PATH = "../../artifacts/jd_query_vector.npy"
+INDEX_PATH = "../../artifacts/faiss_index.bin"
+IDS_PATH = "../../artifacts/candidate_ids.json"
 
 def load_and_prepare_query():
     print(f"Loading parsed JD configuration from {JD_CONFIG_PATH}...")
@@ -42,6 +46,29 @@ def encode_jd_query(query_string):
     
     return jd_vector
 
+def benchmark_retrieval(jd_vector):
+    index = faiss.read_index(INDEX_PATH)
+
+    with open(IDS_PATH, 'r') as f:
+        candidate_ids = json.load(f)
+
+    print(f"Executing search against {index.ntotal} candidate vectors...")
+
+    query_matrix = jd_vector.reshape(1, -1)
+    
+    start_time = time.time()
+    distances, indices = index.search(query_matrix, k=10)
+    search_duration = time.time() - start_time
+    
+    print(f"Similarity Calculation Speed: {search_duration:.5f} seconds")
+    print(f"Constraints Check: Speed is {'PASS' if search_duration < 1.0 else 'FAIL'} (< 1.0s required)")
+
+    print("\nTop 10 Candidate Retrievals: ")
+    for rank, (faiss_id, score) in enumerate(zip(indices[0], distances[0])):
+        actual_id = candidate_ids[faiss_id]
+        print(f"Rank {rank+1:02d} | Candidate: {actual_id} | Cosine Similarity: {score:.4f}")
+
 if __name__ == "__main__":
     query = load_and_prepare_query()
     vector = encode_jd_query(query)
+    benchmark_retrieval(vector)
