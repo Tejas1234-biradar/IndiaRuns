@@ -4,6 +4,62 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-16] — serialize index and add synthetic recall test
+
+### What changed
+- Added `faiss.write_index` serialization to `artifacts/faiss_index.bin`
+- Implemented an exact-match self-retrieval test
+
+### Why
+Serialized the C++ object to a binary file to satisfy the strict runtime constraints. `rank.py` will use `faiss.read_index()` to instantly load this artifact into memory, avoiding the compute penalty of dynamically injecting 100K vectors at runtime and keeping execution well under the 5-minute sandbox limit. The synthetic recall test guarantees the data structures remain perfectly aligned before deployment.
+
+### Scope
+indexer
+
+## [2026-06-16] — add vectors to FAISS and implement ID mapping
+
+### What changed
+- Created `offline_pipeline/semantic_indexer/build_index.py`
+- Updated `build_index.py` to execute `index.add()`
+- Implemented `map_faiss_to_candidate` function
+
+### Why
+Inner Product was selected because the embedder L2-normalizes the outputs, making IP mathematically equivalent to Cosine Similarity. A Flat index is used because 100K vectors easily fit in memory and a brute-force exact search guarantees 100% recall without the approximation loss of IVF or HNSW.
+Loaded the 100K candidate vectors into the FAISS C++ backend. Implemented implicit positional mapping. The integer FAISS returns serves as the exact O(1) lookup index.
+
+### Scope
+indexer
+
+## [2026-06-16] — implement candidate vectorizer 
+
+### What changed
+- Created `offline_pipeline/candidate_embeddings/candidate_embedder.py`
+- Added `*.npy` to `.gitignore`
+- Added `offline_pipeline/*.json` to `.gitignore`
+
+### Why
+Built the core embedding script to convert the 100K candidate dataset into a semantic vector space. Implemented a streaming reader to keep memory footprint extremely low while flattening complex candidate JSON structures into dense, natural-language payloads (Headline + Summary + Skills + Career History). Encodes the corpus into L2-normalized 384-dimensional vectors using `BAAI/bge-small-en-v1.5`. Batch size explicitly optimized for 16GB GPU VRAM. Serializes the aligned outputs directly to disk as `candidate_embeddings.npy` and `candidate_ids.json`.
+
+### Scope
+embedder
+
+
+## [2026-06-15] — design JD parsing prompt workflow 
+
+### What changed
+- Created `offline_pipeline/jd_decoder/jd_decoder.py`
+- Generated `jd_structured_config(gemini_flash_model_no.).json`
+
+### Why
+Defined the structured prompt engineering workflow for LLM-based Job Description (JD) parsing. The workflow establishes a system for extracting specific outputs:
+1. **Target Requirements:** Mandatory technical and soft skills.
+2. **Hidden Text Markers:** Keywords or signals indicating potential "culture fit" or "hidden" constraints.
+3. **Anti-patterns:** Explicit exclusionary criteria to filter out unqualified profiles.
+etc.
+This ensures consistent, deterministic extraction of JD requirements, serving as the foundation for the retrieval engine in later stages.
+
+### Scope
+decoder
 
 ## [2026-06-13] — add honeypot detection scanner (Task 2.2)
 
