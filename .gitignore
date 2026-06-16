@@ -8,4 +8,6 @@ __pycache__/
 *.pyc
 .env
 .venv/
+*.npy
+offline_pipeline/*.json
 *.csv
