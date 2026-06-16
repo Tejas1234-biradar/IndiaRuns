@@ -4,6 +4,33 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-16] — benchmark CPU retrieval speed against FAISS candidate index
+
+### What changed
+- Added `benchmark_retrieval` testing function to `jd_embedder.py`
+- Integrated `faiss.read_index` and evaluated top-10 retrieval timings
+
+### Why
+To fulfill the runtime sandbox constraints, we must empirically prove that computing similarity between the JD query and the 100K candidates is highly performant on a CPU. The benchmark verifies that a Top-10 exact inner-product search over 100K vectors completes in ~10-20m. 
+
+### Scope
+jd-embedder
+
+## [2026-06-16] — extract and embed JD query payload 
+
+### What changed
+- Created `offline_pipeline/jd_decoder/jd_embedder.py`
+- Implemented logic to read `jd_structured_config.json`
+- Added `encode_jd_query` logic using `sentence-transformers`
+- Enforced L2 normalization and float32 data typing
+- Saved resulting array to `artifacts/jd_query_vector.npy`
+
+### Why
+Encoded the JD payload into the exact same semantic vector space as the candidate dataset. Explicitly applied `normalize_embeddings=True` to guarantee mathematical compatibility with the FAISS `IndexFlatIP` search architecture (enabling Cosine Similarity).
+
+### Scope
+jd-embedder
+
 ## [2026-06-16] — serialize index and add synthetic recall test
 
 ### What changed
