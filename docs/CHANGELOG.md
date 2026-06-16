@@ -4,13 +4,16 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
-## [2026-06-16] — load embeddings and initialize FAISS index
+## [2026-06-16] — add vectors to FAISS and implement ID mapping
 
 ### What changed
 - Created `offline_pipeline/semantic_indexer/build_index.py`
+- Updated `build_index.py` to execute `index.add()`
+- Implemented `map_faiss_to_candidate` function
 
 ### Why
-Initialized a `faiss.IndexFlatIP` structure. Inner Product was selected because the embedder L2-normalizes the outputs, making IP mathematically equivalent to Cosine Similarity. A Flat index is used because 100K vectors easily fit in memory and a brute-force exact search guarantees 100% recall without the approximation loss of IVF or HNSW.
+Inner Product was selected because the embedder L2-normalizes the outputs, making IP mathematically equivalent to Cosine Similarity. A Flat index is used because 100K vectors easily fit in memory and a brute-force exact search guarantees 100% recall without the approximation loss of IVF or HNSW.
+Loaded the 100K candidate vectors into the FAISS C++ backend. Implemented implicit positional mapping. The integer FAISS returns serves as the exact O(1) lookup index.
 
 ### Scope
 indexer
