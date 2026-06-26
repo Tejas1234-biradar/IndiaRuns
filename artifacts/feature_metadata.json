@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-26T12:20:58.935594",
+  "generated_at": "2026-06-26T14:10:52.223660+00:00",
   "total_columns": 13,
   "total_rows": 100000,
   "features": {
@@ -60,7 +60,7 @@
       "null_percentage": 0.0,
       "min": 0.0,
       "max": 0.9990000128746033,
-      "mean": 0.49959874153137207,
+      "mean": 0.49979621171951294,
       "description": "Cosine similarity distance from M1 FAISS index.",
       "imputation_rule": "mean"
     },

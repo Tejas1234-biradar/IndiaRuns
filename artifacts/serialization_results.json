@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-06-26T12:20:58.893593",
+  "timestamp": "2026-06-26T14:10:52.181959+00:00",
   "features": {
     "path": "artifacts/features.parquet",
     "metadata": {
@@ -25,7 +25,7 @@
   "metadata": {
     "path": "artifacts/feature_metadata.json",
     "summary": {
-      "generated_at": "2026-06-26T12:20:58.935594",
+      "generated_at": "2026-06-26T14:10:52.223660+00:00",
       "total_columns": 13,
       "total_rows": 100000,
       "features": {
@@ -86,7 +86,7 @@
           "null_percentage": 0.0,
           "min": 0.0,
           "max": 0.9990000128746033,
-          "mean": 0.49959874153137207,
+          "mean": 0.49979621171951294,
           "description": "Cosine similarity distance from M1 FAISS index.",
           "imputation_rule": "mean"
         },
@@ -175,7 +175,7 @@
       "valid": true,
       "num_rows": 100000,
       "num_columns": 13,
-      "load_time_seconds": 0.011,
+      "load_time_seconds": 0.012,
       "file_size_mb": 1.6357316970825195,
       "has_candidate_id": true,
       "candidate_ids_unique": 100000,
