@@ -15,7 +15,7 @@ import time
 import pandas as pd
 import psutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 
 
@@ -26,7 +26,7 @@ class PerformanceBenchmark:
         self.output_dir = output_dir
         self.benchmark_path = os.path.join(output_dir, "benchmark_results.json")
         self.results = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'benchmarks': {}
         }
     

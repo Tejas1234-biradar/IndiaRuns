@@ -16,7 +16,7 @@ import json
 import pickle
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Set, Any, Tuple
 import time
 
@@ -153,7 +153,7 @@ class MetadataGenerator:
         print(f"\n[Metadata] Generating feature schema metadata...")
         
         metadata = {
-            'generated_at': datetime.utcnow().isoformat(),
+            'generated_at': datetime.now(timezone.utc).isoformat(),
             'total_columns': len(df.columns),
             'total_rows': len(df),
             'features': {}
@@ -305,7 +305,7 @@ class SerializationPipeline:
         print("="*70)
         
         results = {
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'features': {},
             'honeypots': {},
             'metadata': {},
