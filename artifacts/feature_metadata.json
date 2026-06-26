@@ -1,0 +1,145 @@
+{
+  "generated_at": "2026-06-26T12:20:58.935594",
+  "total_columns": 13,
+  "total_rows": 100000,
+  "features": {
+    "candidate_id": {
+      "dtype": "str",
+      "pandas_dtype": "str",
+      "null_count": 0,
+      "null_percentage": 0.0
+    },
+    "years_of_experience": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 1.0,
+      "max": 16.899999618530273,
+      "mean": 7.166318893432617,
+      "description": "Total years of professional experience.",
+      "imputation_rule": "fill_zero"
+    },
+    "num_previous_jobs": {
+      "dtype": "int64",
+      "pandas_dtype": "int64",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 1.0,
+      "max": 9.0,
+      "mean": 3.00171,
+      "description": "Total count of jobs listed in career history.",
+      "imputation_rule": "fill_zero"
+    },
+    "num_skills_listed": {
+      "dtype": "int64",
+      "pandas_dtype": "int64",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 5.0,
+      "max": 23.0,
+      "mean": 9.60302,
+      "description": "Total count of skills on the profile.",
+      "imputation_rule": "fill_zero"
+    },
+    "max_assessment_score": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.0,
+      "max": 93.9000015258789,
+      "mean": 12.402737617492676,
+      "description": "Highest score across all verified skill assessments.",
+      "imputation_rule": "fill_zero"
+    },
+    "faiss_distance_to_jd": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.0,
+      "max": 0.9990000128746033,
+      "mean": 0.49959874153137207,
+      "description": "Cosine similarity distance from M1 FAISS index.",
+      "imputation_rule": "mean"
+    },
+    "github_activity_score": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.0,
+      "max": 96.9000015258789,
+      "mean": 10.265600204467773,
+      "description": "0-100 score of recent GitHub commits/PRs.",
+      "imputation_rule": "fill_zero"
+    },
+    "recruiter_response_rate": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.019999999552965164,
+      "max": 0.949999988079071,
+      "mean": 0.4365735948085785,
+      "description": "Percentage of recruiter messages replied to (0.0 to 1.0).",
+      "imputation_rule": "mean"
+    },
+    "interview_completion_rate": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.30000001192092896,
+      "max": 1.0,
+      "mean": 0.6195099353790283,
+      "description": "Percentage of accepted interviews actually attended.",
+      "imputation_rule": "fill_zero"
+    },
+    "profile_views_received_30d": {
+      "dtype": "int64",
+      "pandas_dtype": "int64",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.0,
+      "max": 374.0,
+      "mean": 47.98525,
+      "description": "Inbound profile traffic.",
+      "imputation_rule": "fill_zero"
+    },
+    "days_since_active": {
+      "dtype": "int64",
+      "pandas_dtype": "int64",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 13.0,
+      "max": 253.0,
+      "mean": 121.72389,
+      "description": "Days since last platform login.",
+      "imputation_rule": "max_penalty"
+    },
+    "avg_job_duration_months": {
+      "dtype": "float32",
+      "pandas_dtype": "float32",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 8.399999618530273,
+      "max": 187.1999969482422,
+      "mean": 28.787660598754883,
+      "description": "Total months of experience divided by number of jobs.",
+      "imputation_rule": "mean"
+    },
+    "notice_period_days": {
+      "dtype": "int64",
+      "pandas_dtype": "int64",
+      "null_count": 0,
+      "null_percentage": 0.0,
+      "min": 0.0,
+      "max": 150.0,
+      "mean": 87.3858,
+      "description": "Days required before candidate can join.",
+      "imputation_rule": "fill_median"
+    }
+  }
+}
