@@ -4,6 +4,19 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-26] — defined feature matrix schema
+
+### What changed
+- Created `offline_pipeline/feature_engineering/feature_schema.py`
+- Defined experience, skill, behavioural, and activity metrics.
+- Added `print_schema_documentation()` utility to generate markdown specs.
+
+### Why
+Defined unified tabular feature schema to enable assembly of the final tabular feature matrix for all 100,000 candidates.
+
+### Scope
+schema
+
 ## [2026-06-16] — benchmark CPU retrieval speed against FAISS candidate index
 
 ### What changed
