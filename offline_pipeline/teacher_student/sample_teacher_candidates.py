@@ -36,6 +36,7 @@ import pickle
 from datetime import datetime, timezone
 
 import numpy as np
+import orjson
 import pandas as pd
 
 
@@ -276,3 +277,169 @@ def validate_sample_diversity(sample_df: pd.DataFrame, honeypot_ids: set) -> dic
             print(f"    - {issue}")
 
     return report
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 4 — Export teacher sample with full candidate context
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_parsed_context(parsed_path: str, candidate_ids: set) -> dict:
+    """
+    Load full normalized records (Task 2.1 output) for only the candidates
+    in our sample, keyed by candidate_id. The LLM teacher needs the full
+    text context (headline, summary, career, skills) — not just numeric
+    features — to assign a qualification score.
+    """
+    print(f"\n[CONTEXT] Loading full candidate context from {parsed_path} …")
+    context = {}
+    with open(parsed_path, "rb") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            rec = __import__("orjson").loads(line)
+            if rec["candidate_id"] in candidate_ids:
+                context[rec["candidate_id"]] = rec
+    print(f"  Matched context for {len(context):,} / {len(candidate_ids):,} sampled candidates")
+    missing = candidate_ids - set(context.keys())
+    if missing:
+        print(f"  ⚠ WARNING: {len(missing)} sampled IDs not found in parsed records: "
+              f"{list(missing)[:5]}{'...' if len(missing) > 5 else ''}")
+    return context
+
+
+def export_teacher_sample(sample_df: pd.DataFrame, context: dict, out_dir: str) -> str:
+    """
+    Write the final teacher sample to JSONL. Each line combines:
+      - the numeric features (for traceability back to the feature matrix)
+      - the full candidate text context (for the LLM teacher prompt)
+      - the assigned quality_segment (for post-hoc analysis of teacher scores)
+    """
+    out_path = os.path.join(out_dir, "teacher_sample.jsonl")
+    print(f"\n[EXPORT] Writing teacher sample → {out_path}")
+
+    written = 0
+    skipped = 0
+    with open(out_path, "wb") as fh:
+        for _, row in sample_df.iterrows():
+            cid = row["candidate_id"]
+            ctx = context.get(cid)
+            if ctx is None:
+                skipped += 1
+                continue
+
+            record = {
+                "candidate_id":     cid,
+                "quality_segment":  row["quality_segment"],
+                "features": {
+                    col: (float(row[col]) if isinstance(row[col], (np.floating, float))
+                          else int(row[col]) if isinstance(row[col], (np.integer, int))
+                          else row[col])
+                    for col in sample_df.columns
+                    if col not in ("candidate_id", "quality_segment")
+                },
+                "context": {
+                    "headline":           ctx.get("current_title", ""),
+                    "current_company":    ctx.get("current_company", ""),
+                    "years_of_experience": ctx.get("years_of_experience"),
+                    "career_titles":      ctx.get("career_titles", []),
+                    "career_companies":   ctx.get("career_companies", []),
+                    "skill_names":        ctx.get("skill_names", []),
+                    "best_edu_tier":      ctx.get("best_edu_tier", ""),
+                    "embedding_text":     ctx.get("embedding_text", ""),
+                },
+            }
+            fh.write(__import__("orjson").dumps(record))
+            fh.write(b"\n")
+            written += 1
+
+    print(f"  Written: {written:,}  Skipped (no context match): {skipped:,}")
+    return out_path
+
+
+def save_validation_report(report: dict, thresholds: dict, out_dir: str) -> str:
+    """Save the full diversity validation report as JSON for audit purposes."""
+    full_report = {
+        "generated_at":             datetime.now(tz=timezone.utc).isoformat(),
+        "sample_allocation_target": SAMPLE_ALLOCATION,
+        "computed_thresholds":      {k: float(v) for k, v in thresholds.items()},
+        "validation":               report,
+    }
+    report_path = os.path.join(out_dir, "teacher_sample_report.json")
+    with open(report_path, "w", encoding="utf-8") as fh:
+        json.dump(full_report, fh, indent=2)
+    print(f"[REPORT] teacher_sample_report.json → {report_path}")
+    return report_path
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(description="Task 2.4 — Diverse Teacher Sampling Pipeline")
+    parser.add_argument("--features",  default="artifacts/candidate_features.parquet",
+                        help="Path to the unified feature matrix (Task 2.3 output)")
+    parser.add_argument("--honeypots", default="artifacts/honeypot_ids.pkl",
+                        help="Path to the honeypot blocklist (Task 2.2 output)")
+    parser.add_argument("--parsed",    default="artifacts/candidates_parsed.jsonl",
+                        help="Path to normalized candidate records (Task 2.1 output)")
+    parser.add_argument("--out_dir",   default="artifacts/",
+                        help="Directory to write output files")
+    parser.add_argument("--seed",      type=int, default=42,
+                        help="Random seed for reproducible sampling")
+    args = parser.parse_args()
+
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    print("=" * 60)
+    print("Task 2.4 — Diverse Teacher Sampling Pipeline")
+    print(f"Started: {datetime.now(tz=timezone.utc).isoformat()}")
+    print("=" * 60)
+
+    # 1. Load
+    df = load_feature_matrix(args.features)
+    honeypot_ids = load_honeypot_ids(args.honeypots)
+
+    # 2. Exclude honeypots
+    df_clean = exclude_honeypots(df, honeypot_ids)
+
+    # 3. Classify segments
+    thresholds = compute_thresholds(df_clean)
+    df_classified = add_segment_column(df_clean, thresholds)
+
+    # 4. Stratified sample
+    sample_df = stratified_sample(df_classified, SAMPLE_ALLOCATION, seed=args.seed)
+
+    # 5. Validate diversity
+    validation_report = validate_sample_diversity(sample_df, honeypot_ids)
+
+    # 6. Load full context and export
+    sampled_ids = set(sample_df["candidate_id"])
+    context = load_parsed_context(args.parsed, sampled_ids)
+    export_teacher_sample(sample_df, context, args.out_dir)
+    save_validation_report(validation_report, thresholds, args.out_dir)
+
+    # 7. Final summary
+    print("\n" + "=" * 60)
+    print("FINAL SUMMARY")
+    print("=" * 60)
+    print(f"  Pool size (honeypot-free):  {len(df_clean):,}")
+    print(f"  Total sampled:              {len(sample_df):,}")
+    print(f"  Validation status:          {validation_report['status']}")
+    print(f"\n  Segment breakdown:")
+    for seg, count in validation_report["segment_counts"].items():
+        pct = validation_report["segment_pct"][seg]
+        print(f"    {seg:<20} {count:>5,}  ({pct}%)")
+    print(f"\n  Outputs:")
+    print(f"    artifacts/teacher_sample.jsonl")
+    print(f"    artifacts/teacher_sample_report.json")
+    print("=" * 60)
+    print(f"\nTask 2.4 complete. {datetime.now(tz=timezone.utc).isoformat()}")
+
+    if validation_report["status"] == "FAIL":
+        print("\n⚠ Validation failed — review artifacts/teacher_sample_report.json")
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
