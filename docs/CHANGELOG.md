@@ -4,6 +4,56 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-26] — add diverse teacher sampling pipeline (Task 2.4)
+
+### What changed
+- Created offline_pipeline/teacher_student/sample_teacher_candidates.py
+- Added unit tests in tests/test_teacher_sampling.py
+
+### Why
+Built a stratified sampling pipeline to select 3,000 candidates for LLM Teacher
+evaluation from the unified feature matrix (Task 2.3 output). Excludes all 65
+confirmed honeypots before sampling. Classifies the honeypot-free pool of
+99,935 candidates into 5 dynamically-thresholded quality segments — strong fit,
+average match, weak fit, hidden gem, and keyword stuffer — using FAISS semantic
+distance, listed skill count, and validated assessment scores. Draws a fixed
+allocation (900/900/600/300/300) across segments with automatic shortfall
+redistribution if any segment pool is too small. Validates the final sample for
+duplicate IDs, honeypot leakage, missing segments, and segment dominance before
+export. Exports artifacts/teacher_sample.jsonl with full numeric features and
+text context (headline, career history, skills, embedding text) for each
+sampled candidate, ready for M3's LLM teacher prompting in Task 3.3.
+
+### Scope
+sampling
+
+## [2026-06-26] — assembled final tabular feature matrix for all candidates
+
+### What changed
+- Created `offline_pipeline/feature_engineering/assemble_features.py`
+- Implemented global `index.search` to map `faiss_distance_to_jd` for all 100K candidates.
+- Implemented derived calculations (e.g., `avg_job_duration_months`).
+- Exported the final 100K-row dataset to `artifacts/candidate_features.parquet`.
+
+### Why
+Assembled the fully numeric, model-ready ranking matrix. Downcasted datatypes to save memory for the strict sandbox limits. Chose the `.parquet` format for serialization because it performs drastically faster reads inside `rank.py` compared to `.csv` and strictly preserves schema data types, preventing runtime type-inference errors.
+
+### Scope
+feature-matrix
+
+## [2026-06-26] — defined feature matrix schema
+
+### What changed
+- Created `offline_pipeline/feature_engineering/feature_schema.py`
+- Defined experience, skill, behavioural, and activity metrics.
+- Added `print_schema_documentation()` utility to generate markdown specs.
+
+### Why
+Defined unified tabular feature schema to enable assembly of the final tabular feature matrix for all 100,000 candidates.
+
+### Scope
+schema
+
 ## [2026-06-16] — benchmark CPU retrieval speed against FAISS candidate index
 
 ### What changed
