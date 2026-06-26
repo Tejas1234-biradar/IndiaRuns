@@ -9,6 +9,7 @@ PARSED_CANDIDATES_PATH = "../../artifacts/candidates_parsed.jsonl"
 JD_VECTOR_PATH = "../../artifacts/jd_query_vector.npy"
 INDEX_PATH = "../../artifacts/faiss_index.bin"
 CANDIDATE_IDS_PATH = "../../artifacts/candidate_ids.json"
+OUTPUT_MATRIX_PATH = "../../artifacts/candidate_features.parquet"
 
 def calculate_faiss_metrics():
     """
@@ -44,7 +45,6 @@ def load_base_records():
             records.append(json.loads(line))
     return records
 
-# ... (keep existing imports and functions) ...
 from feature_schema import FEATURE_SCHEMA
 
 def build_feature_matrix(raw_records, similarity_map):
@@ -90,8 +90,37 @@ def build_feature_matrix(raw_records, similarity_map):
         
     return pd.DataFrame(processed_rows)
 
+def finalize_and_export(df):
+    """
+    [x] Generate final feature matrix
+    [x] Export training dataset
+    """
+    print("Applying global statistical imputations...")
+    
+    # Apply Schema Imputations
+    for col in df.columns:
+        if col in FEATURE_SCHEMA:
+            rule = FEATURE_SCHEMA[col].get('imputation')
+            if rule == "mean":
+                df[col] = df[col].fillna(df[col].mean())
+            elif rule == "fill_zero":
+                df[col] = df[col].fillna(0.0)
+            elif rule == "fill_median":
+                df[col] = df[col].fillna(df[col].median())
+                
+    # Ensure memory optimization
+    print("Downcasting float types for memory optimization...")
+    float_cols = df.select_dtypes(include=['float64']).columns
+    df[float_cols] = df[float_cols].astype('float32')
+    
+    print(f"Exporting massive matrix to {OUTPUT_MATRIX_PATH} (Parquet Format)...")
+    df.to_parquet(OUTPUT_MATRIX_PATH, engine='pyarrow', index=False)
+    
+    file_size_mb = os.path.getsize(OUTPUT_MATRIX_PATH) / (1024 * 1024)
+    print(f"Task 2.3 Complete. Matrix serialized safely to disk ({file_size_mb:.2f} MB).")
+
 if __name__ == "__main__":
     similarity_map = calculate_faiss_metrics()
     raw_records = load_base_records()
     df = build_feature_matrix(raw_records, similarity_map)
-    print(f"Matrix Assembled. Shape: {df.shape}")
+    finalize_and_export(df)

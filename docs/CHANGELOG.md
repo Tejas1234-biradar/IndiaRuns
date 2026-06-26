@@ -4,15 +4,16 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
-## [2026-06-26] — load records and calculate global FAISS similarity metrics
+## [2026-06-26] — assembled final tabular feature matrix for all candidates
 
 ### What changed
 - Created `offline_pipeline/feature_engineering/assemble_features.py`
 - Implemented global `index.search` to map `faiss_distance_to_jd` for all 100K candidates.
 - Implemented derived calculations (e.g., `avg_job_duration_months`).
+- Exported the final 100K-row dataset to `artifacts/candidate_features.parquet`.
 
 ### Why
-To build the unified feature matrix, we first need to evaluate the candidate pool against the JD embedding. By querying the FAISS index with `k=100000`, we extract the mathematically exact cosine similarity score for every candidate in a single CPU operation, effectively vectorizing the semantic component of our feature matrix.
+Assembled the fully numeric, model-ready ranking matrix. Downcasted datatypes to save memory for the strict sandbox limits. Chose the `.parquet` format for serialization because it performs drastically faster reads inside `rank.py` compared to `.csv` and strictly preserves schema data types, preventing runtime type-inference errors.
 
 ### Scope
 feature-matrix
