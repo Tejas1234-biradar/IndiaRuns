@@ -4,14 +4,15 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
-## [2026-06-26] — define feature matrix schema
+## [2026-06-26] — defined feature matrix schema
 
 ### What changed
 - Created `offline_pipeline/feature_engineering/feature_schema.py`
 - Defined experience, skill, behavioural, and activity metrics.
+- Added `print_schema_documentation()` utility to generate markdown specs.
 
 ### Why
-Initiated the feature schema definition for Task 3.2. Defined the base profile metrics and the critical M1 integration point (`faiss_distance_to_jd`). Explicitly defined imputation rules (like clipping max experience to 40 years) to prevent outliers from skewing the XGBoost tree splits.
+Defined unified tabular feature schema to enable assembly of the final tabular feature matrix for all 100,000 candidates.
 
 ### Scope
 schema

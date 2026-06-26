@@ -68,7 +68,39 @@ FEATURE_SCHEMA = {
         "description": "Inbound profile traffic.",
         "imputation": "fill_zero"
     },
+# ... (keep existing features) ...
+
+    # --- [x] Tenure Features ---
+    "avg_job_duration_months": {
+        "type": "float",
+        "description": "Total months of experience divided by number of jobs.",
+        "imputation": "mean",
+        "calculation_rule": "(years_of_experience * 12) / max(num_previous_jobs, 1)"
+    },
+    "notice_period_days": {
+        "type": "int",
+        "description": "Days required before candidate can join.",
+        "imputation": "fill_median" # Median is safest for missing notice periods
+    }
 }
+
+# --- [x] Feature Documentation ---
+def print_schema_documentation():
+    """Generates a markdown-friendly schema doc"""
+    print("# Final Feature Matrix Schema")
+    print(f"Total Features: {len(FEATURE_SCHEMA)}\n")
+    for feature, meta in FEATURE_SCHEMA.items():
+        print(f"### `{feature}` ({meta['type']})")
+        print(f"- **Description:** {meta['description']}")
+        print(f"- **Imputation Logic:** {meta['imputation']}")
+        if "sentinel_value" in meta:
+            print(f"- **Sentinel (Missing) Value:** {meta['sentinel_value']}")
+        if "calculation_rule" in meta:
+            print(f"- **Derived Calculation:** `{meta['calculation_rule']}`")
+        print()
 
 def get_feature_columns():
     return list(FEATURE_SCHEMA.keys())
+
+if __name__ == "__main__":
+    print_schema_documentation()
