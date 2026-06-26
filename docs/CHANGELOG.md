@@ -4,6 +4,18 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-26] — implement deterministic Pydantic schema for Teacher LLM
+
+### What changed
+- Updated `teacher_prompt.py` to include `TeacherEvaluationSchema` (Pydantic).
+
+
+### Why
+To train the student XGBoost model, we require mathematically strictly bounded targets (0.0 to 10.0). By defining a Pydantic schema, we can force the Gemini API to return guaranteed structured JSON, preventing pipeline crashes caused by hallucinated or misformatted text responses. Injecting the parsed JD ensures the LLM evaluates against the dynamic criteria defined in Task 1.1.
+
+### Scope
+teacher-llm
+
 ## [2026-06-26] — add diverse teacher sampling pipeline (Task 2.4)
 
 ### What changed
