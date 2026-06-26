@@ -34,7 +34,40 @@ FEATURE_SCHEMA = {
         "type": "float",
         "description": "Highest score across all verified skill assessments.",
         "imputation": "fill_zero"
-    }
+    },
+    # ... (keep existing features) ...
+
+    # --- [x] Behavioral Features ---
+    "recruiter_response_rate": {
+        "type": "float",
+        "description": "Percentage of recruiter messages replied to (0.0 to 1.0).",
+        "imputation": "mean", # If they haven't received messages, assume average behavior
+        "sentinel_value": -1.0
+    },
+    "interview_completion_rate": {
+        "type": "float",
+        "description": "Percentage of accepted interviews actually attended.",
+        "imputation": "fill_zero",
+        "sentinel_value": -1.0
+    },
+    
+    # --- [x] Activity Features ---
+    "github_activity_score": {
+        "type": "float",
+        "description": "0-100 score of recent GitHub commits/PRs.",
+        "imputation": "fill_zero", # Missing GitHub implies 0 activity
+        "sentinel_value": -1.0
+    },
+    "days_since_active": {
+        "type": "int",
+        "description": "Days since last platform login.",
+        "imputation": "max_penalty", # Missing means highly inactive (e.g., 365 days)
+    },
+    "profile_views_received_30d": {
+        "type": "int",
+        "description": "Inbound profile traffic.",
+        "imputation": "fill_zero"
+    },
 }
 
 def get_feature_columns():
