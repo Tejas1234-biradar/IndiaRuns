@@ -1,5 +1,38 @@
-# LLM Teacher prompt templates and evaluation rubric matching job_description.docx
+import json
+from pydantic import BaseModel, Field
+from typing import List
 
+# --- SCHEMA ENFORCEMENT ---
+class TeacherEvaluationSchema(BaseModel):
+    overall_score: float = Field(
+        description="Weighted final evaluation from 0.0 to 10.0. If hard_reject is true, maximum score is 1.0.",
+        ge=0.0, le=10.0
+    )
+    technical_fit: float = Field(
+        description="Code quality, Python, retrieval, evaluation, and search.",
+        ge=0.0, le=10.0
+    )
+    production_fit: float = Field(
+        description="Experience shipping to real users, product mindset.",
+        ge=0.0, le=10.0
+    )
+    career_fit: float = Field(
+        description="Tenure stability, startup alignment, target years of experience.",
+        ge=0.0, le=10.0
+    )
+    availability_fit: float = Field(
+        description="Notice period, platform activity, location compatibility.",
+        ge=0.0, le=10.0
+    )
+    credibility: float = Field(
+        description="Consistency of profile details, lack of keyword stuffing or anomalies.",
+        ge=0.0, le=10.0
+    )
+    hard_reject: bool = Field(description="True if any strict disqualifier is met.")
+    evidence: List[str] = Field(description="List of key positive observations.")
+    concerns: List[str] = Field(description="List of key negative observations or risks.")
+
+# --- PROMPT TEMPLATES ---
 SYSTEM_PROMPT = """You are the Talent Acquisition and AI Engineering Leadership team at Redrob AI, a Series A AI-native talent intelligence platform.
 Your task is to evaluate a candidate's profile against our Job Description (JD) for the Senior AI Engineer (Founding Team) role.
 
@@ -30,130 +63,34 @@ Below is the Job Description summary and grading guidelines:
 ### Evaluation Tasks
 1. Extract positive evidence (e.g. product company experience, shipped search engines, open source).
 2. Extract concerns (e.g. long notice period, consulting background, title chasing).
-3. Score each dimension on a scale of 0.0 to 10.0:
-   - `technical_fit`: Code quality, Python, retrieval, evaluation, and search.
-   - `production_fit`: Experience shipping to real users, product mindset.
-   - `career_fit`: Tenure stability, startup alignment, target years of experience.
-   - `availability_fit`: Notice period, platform activity, location compatibility.
-   - `credibility`: Consistency of profile details, lack of keyword stuffing or anomalies.
-4. Determine `hard_reject` (true/false) based on the disqualifiers.
+3. Score each dimension on a scale of 0.0 to 10.0 based on the schema definitions.
+4. Determine `hard_reject` based on the disqualifiers.
 5. Calculate `overall_score` (0.0 to 10.0) as a weighted evaluation:
    - If `hard_reject` is true, maximum overall_score is 1.0.
    - Otherwise, weight technical/production/career/availability fit according to importance (suggested weights: 35% Tech Fit, 30% Production Fit, 15% Career Fit, 20% Availability/Logistics).
-
-You MUST output your evaluation in the following JSON schema format exactly. Do not include markdown code block syntax or any additional text.
-
-JSON Schema:
-{
-  "overall_score": float,  // 0.0 to 10.0
-  "technical_fit": float,  // 0.0 to 10.0
-  "production_fit": float, // 0.0 to 10.0
-  "career_fit": float,     // 0.0 to 10.0
-  "availability_fit": float, // 0.0 to 10.0
-  "credibility": float,    // 0.0 to 10.0
-  "hard_reject": boolean,  // true if any strict disqualifier is met
-  "evidence": [string],    // List of key positive observations
-  "concerns": [string]     // List of key negative observations / risks
-}
 """
 
-USER_PROMPT_TEMPLATE = """Please evaluate the candidate profile below.
-
-### Candidate ID: {candidate_id}
-
-### Profile Info:
-Headline: {headline}
-Summary: {summary}
-Years of Experience: {years_of_experience}
-Location: {location}, {country}
-
-### Career History:
-{career_history_summary}
-
-### Skills & Assessments:
-Skills: {skills_summary}
-Redrob Skill Assessment Scores: {assessments_summary}
-
-### Platform Activity Signals:
-Notice Period: {notice_period_days} days
-Recruiter Response Rate: {recruiter_response_rate:.2f}
-Average Response Time: {avg_response_time_hours} hours
-Last Active Date: {last_active_date}
-Signup Date: {signup_date}
-Open To Work: {open_to_work}
-Willing To Relocate: {willing_to_relocate}
-GitHub Activity Score: {github_activity_score}
-Offer Acceptance Rate: {offer_acceptance_rate}
-Connection Count: {connection_count}
-Profile Views (30d): {profile_views}
-Saved by Recruiters (30d): {saved_by_recruiters}
-Interview Completion Rate: {interview_completion_rate:.2f}
-
-Evaluate carefully and output ONLY the JSON object.
-"""
-
-def format_candidate_for_prompt(candidate):
+def format_candidate_prompt(candidate):
     """
-    Format a raw candidate JSON record from candidates.jsonl into user prompt variables.
+    Injects candidate profile into a clean string format for the LLM.
     """
-    cid = candidate.get("candidate_id")
-    profile = candidate.get("profile", {})
-    history = candidate.get("career_history", [])
-    skills = candidate.get("skills", [])
-    signals = candidate.get("redrob_signals", {})
+    signals = candidate.get('redrob_signals', {})
     
-    # Format career history
-    history_lines = []
-    for job in history:
-        company = job.get("company", "Unknown")
-        title = job.get("title", "Unknown")
-        duration = job.get("duration_months", 0)
-        desc = job.get("description", "")
-        industry = job.get("industry", "Unknown")
-        company_size = job.get("company_size", "Unknown")
-        history_lines.append(
-            f"- Title: {title} | Company: {company} ({company_size}, {industry}) | Duration: {duration} months\n"
-            f"  Description: {desc}"
-        )
-    career_history_summary = "\n".join(history_lines) if history_lines else "No work experience listed."
+    prompt = f"""
+    CANDIDATE PROFILE:
     
-    # Format skills
-    skills_summary = ", ".join([f"{s.get('name')} ({s.get('proficiency', '')}, dur: {s.get('duration_months', 0)}m)" for s in skills])
+    Title: {candidate.get('current_title', 'Unknown')}
+    Experience: {candidate.get('years_of_experience', 0)} years
+    Companies: {', '.join(candidate.get('career_companies', []))}
+    Skills: {', '.join(candidate.get('skill_names', []))}
     
-    # Format assessments
-    assessments = signals.get("skill_assessment_scores", {})
-    assessments_summary = ", ".join([f"{k}: {v}" for k, v in assessments.items()]) if assessments else "No Redrob platform assessments completed."
+    BEHAVIORAL SIGNALS:
+    Notice Period: {signals.get('notice_period_days', 'Unknown')} days
+    Recruiter Response Rate: {signals.get('recruiter_resp_rate', 'N/A')}
+    GitHub Activity: {signals.get('github_activity_score', 'N/A')}
+    Days Since Active: {signals.get('days_inactive', 'N/A')}
     
-    # Format github and offer accept sentinel indicators
-    github_act = signals.get("github_activity_score", -1)
-    github_score_str = str(github_act) if github_act != -1 else "No GitHub account linked"
-    
-    offer_acc = signals.get("offer_acceptance_rate", -1.0)
-    offer_acc_str = f"{offer_acc*100:.1f}%" if offer_acc != -1.0 else "No prior offers history"
-    
-    formatted_prompt = USER_PROMPT_TEMPLATE.format(
-        candidate_id=cid,
-        headline=profile.get("headline", ""),
-        summary=profile.get("summary", ""),
-        years_of_experience=profile.get("years_of_experience", 0),
-        location=profile.get("location", ""),
-        country=profile.get("country", ""),
-        career_history_summary=career_history_summary,
-        skills_summary=skills_summary,
-        assessments_summary=assessments_summary,
-        notice_period_days=signals.get("notice_period_days", 0),
-        recruiter_response_rate=signals.get("recruiter_response_rate", 0.0),
-        avg_response_time_hours=signals.get("avg_response_time_hours", 0.0),
-        last_active_date=signals.get("last_active_date", ""),
-        signup_date=signals.get("signup_date", ""),
-        open_to_work="Yes" if signals.get("open_to_work_flag") else "No",
-        willing_to_relocate="Yes" if signals.get("willing_to_relocate") else "No",
-        github_activity_score=github_score_str,
-        offer_acceptance_rate=offer_acc_str,
-        connection_count=signals.get("connection_count", 0),
-        profile_views=signals.get("profile_views_received_30d", 0),
-        saved_by_recruiters=signals.get("saved_by_recruiters_30d", 0),
-        interview_completion_rate=signals.get("interview_completion_rate", 0.0)
-    )
-    
-    return formatted_prompt
+    PROFILE SUMMARY/EMBEDDING TEXT:
+    {candidate.get('embedding_text', '')}
+    """
+    return prompt
