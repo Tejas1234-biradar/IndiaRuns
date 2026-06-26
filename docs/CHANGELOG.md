@@ -4,6 +4,18 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-26] — define experience and skill alignment schema
+
+### What changed
+- Created `offline_pipeline/feature_engineering/feature_schema.py`
+- Defined experience (`years_of_experience`, `num_previous_jobs`) and skill features (`faiss_distance_to_jd`, etc.).
+
+### Why
+Initiated the feature schema definition for Task 3.2. Defined the base profile metrics and the critical M1 integration point (`faiss_distance_to_jd`). Explicitly defined imputation rules (like clipping max experience to 40 years) to prevent outliers from skewing the XGBoost tree splits.
+
+### Scope
+schema
+
 ## [2026-06-16] — benchmark CPU retrieval speed against FAISS candidate index
 
 ### What changed
