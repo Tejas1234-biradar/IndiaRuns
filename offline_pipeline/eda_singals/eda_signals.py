@@ -323,4 +323,4 @@ def analyze_candidates(file_path):
     print("EDA Complete. Reports saved to 'reports/' directory.")
 
 if __name__ == "__main__":
-    analyze_candidates("candidates.jsonl")
+    analyze_candidates("../../data/candidates.jsonl")
