@@ -142,3 +142,137 @@ def add_segment_column(df: pd.DataFrame, thresholds: dict) -> pd.DataFrame:
         pct = count / len(df) * 100
         print(f"    {seg:<20} {count:>7,}  ({pct:.1f}%)")
     return df
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 3 — Stratified sampling
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Target allocation across the 3,000-candidate teacher sample.
+# Weighted toward strong_fit and average_match (the bulk of real evaluation
+# signal) while guaranteeing enough hidden_gem and keyword_stuffer examples
+# for the LLM teacher to calibrate against the JD's explicit anti-patterns.
+SAMPLE_ALLOCATION = {
+    "strong_fit":      900,   # 30% — core positive examples
+    "average_match":   900,   # 30% — bulk of typical candidates
+    "weak_fit":        600,   # 20% — clear negative examples
+    "hidden_gem":       300,   # 10% — JD's explicit "don't miss these" cases
+    "keyword_stuffer":  300,   # 10% — JD's explicit anti-pattern
+}
+TOTAL_SAMPLE_SIZE = sum(SAMPLE_ALLOCATION.values())  # 3,000
+
+
+def stratified_sample(df: pd.DataFrame, allocation: dict, seed: int = 42) -> pd.DataFrame:
+    """
+    Draw a fixed number of candidates from each quality segment.
+    If a segment has fewer candidates than its target allocation,
+    take all available and redistribute the shortfall proportionally
+    across the remaining segments.
+    """
+    print(f"\n[SAMPLE] Drawing stratified sample (target={sum(allocation.values()):,}) …")
+
+    rng = np.random.RandomState(seed)
+    segment_pools = {seg: df[df["quality_segment"] == seg] for seg in allocation}
+
+    # Check for shortfalls before sampling
+    shortfalls = {}
+    for seg, target in allocation.items():
+        available = len(segment_pools[seg])
+        if available < target:
+            shortfalls[seg] = target - available
+            print(f"  ⚠ Segment '{seg}' has only {available:,} candidates "
+                  f"(target {target:,}) — shortfall of {shortfalls[seg]:,}")
+
+    # Redistribute shortfall proportionally across segments with surplus
+    adjusted_allocation = dict(allocation)
+    if shortfalls:
+        total_shortfall = sum(shortfalls.values())
+        surplus_segments = [s for s in allocation if s not in shortfalls]
+        surplus_total = sum(len(segment_pools[s]) - allocation[s] for s in surplus_segments)
+
+        for seg in shortfalls:
+            adjusted_allocation[seg] = len(segment_pools[seg])  # take all available
+
+        for seg in surplus_segments:
+            seg_surplus = len(segment_pools[seg]) - allocation[seg]
+            extra = int(round(total_shortfall * (seg_surplus / surplus_total))) if surplus_total > 0 else 0
+            adjusted_allocation[seg] = allocation[seg] + extra
+
+        print(f"  Adjusted allocation to compensate for shortfall: {adjusted_allocation}")
+
+    sampled_parts = []
+    for seg, n in adjusted_allocation.items():
+        pool = segment_pools[seg]
+        n_draw = min(n, len(pool))
+        sampled = pool.sample(n=n_draw, random_state=seed)
+        sampled_parts.append(sampled)
+        print(f"  {seg:<20} drew {n_draw:>5,} / pool of {len(pool):,}")
+
+    result = pd.concat(sampled_parts, ignore_index=True)
+    # Shuffle final order so segments aren't grouped in the output file
+    result = result.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+
+    print(f"\n  Total sampled: {len(result):,}")
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Section 3b — Diversity validation
+# ─────────────────────────────────────────────────────────────────────────────
+
+def validate_sample_diversity(sample_df: pd.DataFrame, honeypot_ids: set) -> dict:
+    """
+    Confirm the drawn sample meets diversity and safety requirements:
+      1. No duplicate candidate_ids
+      2. No honeypots present
+      3. Every target segment has at least 1 representative
+      4. No single segment exceeds 40% of the total sample
+    Returns a validation report dict and raises on any hard failure.
+    """
+    print("\n[VALIDATE] Checking sample diversity …")
+
+    issues = []
+
+    # 1. Duplicates
+    dupe_count = sample_df["candidate_id"].duplicated().sum()
+    if dupe_count > 0:
+        issues.append(f"{dupe_count} duplicate candidate_ids found in sample")
+
+    # 2. Honeypot leakage
+    leaked = set(sample_df["candidate_id"]) & honeypot_ids
+    if leaked:
+        issues.append(f"{len(leaked)} honeypot IDs leaked into sample: {leaked}")
+
+    # 3. Segment coverage
+    segment_counts = sample_df["quality_segment"].value_counts().to_dict()
+    missing_segments = set(SAMPLE_ALLOCATION.keys()) - set(segment_counts.keys())
+    if missing_segments:
+        issues.append(f"Segments with zero representatives: {missing_segments}")
+
+    # 4. No segment dominance
+    total = len(sample_df)
+    dominant = {seg: c for seg, c in segment_counts.items() if c / total > 0.40}
+    if dominant:
+        issues.append(f"Segments exceeding 40% of sample: {dominant}")
+
+    passed = len(issues) == 0
+
+    report = {
+        "status":           "PASS" if passed else "FAIL",
+        "total_sampled":    total,
+        "segment_counts":   segment_counts,
+        "segment_pct":      {k: round(v / total * 100, 2) for k, v in segment_counts.items()},
+        "duplicate_count":  int(dupe_count),
+        "honeypot_leakage": list(leaked),
+        "issues":           issues,
+    }
+
+    if passed:
+        print(f"  ✓ VALIDATION PASSED — {total:,} candidates, "
+              f"{len(segment_counts)} segments, 0 issues")
+    else:
+        print(f"  ✗ VALIDATION FAILED")
+        for issue in issues:
+            print(f"    - {issue}")
+
+    return report
