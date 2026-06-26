@@ -9,6 +9,7 @@ Format: date, title, what changed, why, scope.
 ### What changed
 - Created `offline_pipeline/feature_engineering/assemble_features.py`
 - Implemented global `index.search` to map `faiss_distance_to_jd` for all 100K candidates.
+- Implemented derived calculations (e.g., `avg_job_duration_months`).
 
 ### Why
 To build the unified feature matrix, we first need to evaluate the candidate pool against the JD embedding. By querying the FAISS index with `k=100000`, we extract the mathematically exact cosine similarity score for every candidate in a single CPU operation, effectively vectorizing the semantic component of our feature matrix.
