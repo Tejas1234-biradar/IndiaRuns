@@ -64,21 +64,29 @@ def build_feature_matrix(raw_records, similarity_map):
         row['years_of_experience'] = min(float(rec.get('years_of_experience', 0.0)), FEATURE_SCHEMA['years_of_experience']['clip_max'])
         row['num_previous_jobs'] = int(rec.get('num_jobs', 0))
         row['num_skills_listed'] = min(int(rec.get('num_skills', 0)), FEATURE_SCHEMA['num_skills_listed']['clip_max'])
-        row['max_assessment_score'] = float(rec.get('max_assessment_score', 0.0))
+        
+        # Map mean_assessment_score as proxy for max_assessment_score
+        row['max_assessment_score'] = float(rec.get('mean_assessment_score', 0.0))
         
         # M1 Integration
         row['faiss_distance_to_jd'] = similarity_map.get(cid, 0.0)
         
-        # Behavioral Features with Sentinel (-1.0) handling
-        row['recruiter_response_rate'] = float(rec.get('recruiter_response_rate', -1.0))
-        row['interview_completion_rate'] = float(rec.get('interview_completion_rate', -1.0))
+        # Behavioral/Activity Features with Sentinel (-1.0) handling
         row['github_activity_score'] = float(rec.get('github_activity_score', -1.0))
-        row['profile_views_received_30d'] = int(rec.get('profile_views_received_30d', 0))
+        row['recruiter_response_rate'] = float(rec.get('recruiter_resp_rate', -1.0))
+        row['interview_completion_rate'] = float(rec.get('interview_comp_rate', -1.0))
+        row['profile_views_received_30d'] = int(rec.get('profile_views_30d', 0))
+        
+        # Add the missing days_inactive mapped to schema's days_since_active
+        # Default to 365 (max penalty) if the key is missing entirely
+        row['days_since_active'] = int(rec.get('days_inactive', 365))
         
         # 2. Derived Tenure Features
         jobs = max(row['num_previous_jobs'], 1)
         row['avg_job_duration_months'] = (row['years_of_experience'] * 12) / jobs
         row['notice_period_days'] = int(rec.get('notice_period_days', 30)) # default imputation
+
+        
         
         # 3. Missing Value Imputation (Replacing Sentinels with np.nan for Pandas handling)
         for col, val in row.items():
