@@ -4,6 +4,20 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-26] — assembled final tabular feature matrix for all candidates
+
+### What changed
+- Created `offline_pipeline/feature_engineering/assemble_features.py`
+- Implemented global `index.search` to map `faiss_distance_to_jd` for all 100K candidates.
+- Implemented derived calculations (e.g., `avg_job_duration_months`).
+- Exported the final 100K-row dataset to `artifacts/candidate_features.parquet`.
+
+### Why
+Assembled the fully numeric, model-ready ranking matrix. Downcasted datatypes to save memory for the strict sandbox limits. Chose the `.parquet` format for serialization because it performs drastically faster reads inside `rank.py` compared to `.csv` and strictly preserves schema data types, preventing runtime type-inference errors.
+
+### Scope
+feature-matrix
+
 ## [2026-06-26] — defined feature matrix schema
 
 ### What changed
