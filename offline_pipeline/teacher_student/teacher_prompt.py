@@ -73,24 +73,27 @@ Below is the Job Description summary and grading guidelines:
 def format_candidate_prompt(candidate):
     """
     Injects candidate profile into a clean string format for the LLM.
+    Handles the nested 'features' and 'context' structure from Task 2.4.
     """
-    signals = candidate.get('redrob_signals', {})
+    # Unpack the nested dictionaries safely
+    ctx = candidate.get('context', {})
+    feats = candidate.get('features', {})
     
     prompt = f"""
     CANDIDATE PROFILE:
     
-    Title: {candidate.get('current_title', 'Unknown')}
-    Experience: {candidate.get('years_of_experience', 0)} years
-    Companies: {', '.join(candidate.get('career_companies', []))}
-    Skills: {', '.join(candidate.get('skill_names', []))}
+    Title: {ctx.get('headline', 'Unknown')}
+    Experience: {ctx.get('years_of_experience', 0)} years
+    Companies: {', '.join(ctx.get('career_companies', []))}
+    Skills: {', '.join(ctx.get('skill_names', []))}
     
     BEHAVIORAL SIGNALS:
-    Notice Period: {signals.get('notice_period_days', 'Unknown')} days
-    Recruiter Response Rate: {signals.get('recruiter_resp_rate', 'N/A')}
-    GitHub Activity: {signals.get('github_activity_score', 'N/A')}
-    Days Since Active: {signals.get('days_inactive', 'N/A')}
+    Notice Period: {feats.get('notice_period_days', 'Unknown')} days
+    Recruiter Response Rate: {feats.get('recruiter_response_rate', 'N/A')}
+    GitHub Activity: {feats.get('github_activity_score', 'N/A')}
+    Days Since Active: {feats.get('days_since_active', 'N/A')}
     
     PROFILE SUMMARY/EMBEDDING TEXT:
-    {candidate.get('embedding_text', '')}
+    {ctx.get('embedding_text', '')}
     """
     return prompt
