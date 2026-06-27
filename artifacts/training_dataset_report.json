@@ -1,0 +1,28 @@
+{
+  "n_labels_input": 3000,
+  "n_failed_labels_excluded": 0,
+  "n_training_samples": 3000,
+  "n_features": 12,
+  "feature_columns": [
+    "years_of_experience",
+    "num_previous_jobs",
+    "faiss_distance_to_jd",
+    "num_skills_listed",
+    "max_assessment_score",
+    "recruiter_response_rate",
+    "interview_completion_rate",
+    "github_activity_score",
+    "days_since_active",
+    "profile_views_received_30d",
+    "avg_job_duration_months",
+    "notice_period_days"
+  ],
+  "target_column": "overall_score",
+  "unmatched_candidate_ids": 0,
+  "feature_missing_values": 0,
+  "target_missing_values": 0,
+  "target_min": 0.0,
+  "target_max": 8.2,
+  "target_mean": 1.6278,
+  "output_path": "artifacts/training_dataset.parquet"
+}
