@@ -3,4 +3,5 @@ xgboost
 shap
 numpy
 pandas
+pyarrow
 orjson
