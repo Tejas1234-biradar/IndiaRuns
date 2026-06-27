@@ -68,10 +68,16 @@ Features are the 12 numerical columns from `feature_schema.py` (experience, FAIS
 | Validation RMSE | 2.83 |
 | Validation MAE | 2.58 |
 | Validation Spearman ρ | 0.53 |
+| **Model accuracy (±1.0 pt)** | **5.2%** |
+| Accuracy within ±2.0 pts | 34.7% |
+| Exact grade match | 21.5% |
+| Rank correlation | 52.5% |
 | Prediction range (val) | −1.77 – 1.55 |
 | Model reload check | PASS |
 
 Spearman correlation on the held-out set confirms the ranker learns meaningful relative ordering from teacher scores. Ranker outputs are unbounded scores used for sorting candidates at inference time.
+
+**Model accuracy** is reported as the percentage of validation samples where the predicted score is within ±1.0 of the teacher's `overall_score`. Rank correlation (52.5%) measures how well the model preserves relative ordering — often more meaningful than pointwise accuracy for a ranker.
 
 ## 5. Artifacts
 

@@ -1,15 +1,37 @@
-artifacts/*.bin
-artifacts/*.pkl
-artifacts/*.xgb
-data/
-*.jsonl
-*.jsonl.gz
+# Python
 __pycache__/
-*.pyc
-.env
-.venv/
-*.npy
-offline_pipeline/*.json
-*.csv
-"offline_pipeline/candidate_embeddings/*.json" 
+*.py[cod]
+*.egg-info/
+dist/
+build/
 
+# Virtual environment
+.venv/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated pipeline artifacts
+artifacts/
+!artifacts/.gitkeep
+
+# Raw input data (465MB)
+data/
+!data/sample_candidates.json
+!data/.gitkeep
+
+# Test caches
+.pytest_cache/
+.mypy_cache/
+
+# Generated output
+submission.csv
