@@ -1,0 +1,25 @@
+{
+  "n_samples": 3000,
+  "zero_score_count": 568,
+  "zero_score_pct": 18.93,
+  "hard_reject_zero_count": 568,
+  "failed_label_count": 0,
+  "failed_label_pct": 0.0,
+  "ambiguous_zero_count": 89,
+  "duplicate_candidate_ids": 0,
+  "missing_candidate_id": 0,
+  "missing_score_values": {
+    "overall_score": 0,
+    "technical_fit": 0,
+    "production_fit": 0,
+    "career_fit": 0,
+    "availability_fit": 0,
+    "credibility": 0
+  },
+  "total_missing_score_values": 0,
+  "score_min": 0.0,
+  "score_max": 8.2,
+  "score_mean": 1.6278,
+  "integrity_passed": true,
+  "max_allowed_failed_pct": 5.0
+}
