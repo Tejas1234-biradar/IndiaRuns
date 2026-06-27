@@ -4,6 +4,18 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-26] — updated labeling prompt and labeled 3000 samples
+
+### What changed
+- Updated `generate_labels.py` to include API calls for labelling candidates.
+
+
+### Why
+For training model, it is required to generate target labels for a sample of candidates.
+
+### Scope
+teacher-llm
+
 ## [2026-06-26] — implement deterministic Pydantic schema for Teacher LLM
 
 ### What changed
