@@ -127,6 +127,15 @@ def train_ranker(
 
     y_val_pred = ranker.predict(X_val)
 
+    # Accuracy-style metrics against continuous teacher scores
+    abs_err = np.abs(y_val - y_val_pred)
+    tolerance_acc = float((abs_err <= 1.0).mean() * 100)
+    tolerance_2_acc = float((abs_err <= 2.0).mean() * 100)
+    exact_grade_acc = float(
+        (np.round(y_val) == np.round(np.clip(y_val_pred, 0, 10))).mean() * 100
+    )
+    spearman = _spearman(y_val, y_val_pred)
+
     metrics = {
         "n_train": n_train,
         "n_val": n_val,
@@ -139,7 +148,11 @@ def train_ranker(
         "n_val_groups": n_val_groups,
         "val_rmse": round(float(np.sqrt(mean_squared_error(y_val, y_val_pred))), 4),
         "val_mae": round(float(mean_absolute_error(y_val, y_val_pred)), 4),
-        "val_spearman": round(_spearman(y_val, y_val_pred), 4),
+        "val_spearman": round(spearman, 4),
+        "val_rank_correlation_pct": round(spearman * 100, 2),
+        "val_accuracy_pct": round(tolerance_acc, 2),
+        "val_accuracy_within_2pt_pct": round(tolerance_2_acc, 2),
+        "val_exact_grade_accuracy_pct": round(exact_grade_acc, 2),
         "val_pred_min": round(float(y_val_pred.min()), 4),
         "val_pred_max": round(float(y_val_pred.max()), 4),
         "val_pred_mean": round(float(y_val_pred.mean()), 4),
@@ -172,6 +185,9 @@ def train_ranker(
     print(f"  Validation RMSE:     {metrics['val_rmse']:.4f}")
     print(f"  Validation MAE:      {metrics['val_mae']:.4f}")
     print(f"  Validation Spearman: {metrics['val_spearman']:.4f}")
+    print(f"  Model accuracy:      {metrics['val_accuracy_pct']:.1f}% "
+          f"(within ±1.0 of teacher score)")
+    print(f"  Rank correlation:    {metrics['val_rank_correlation_pct']:.1f}%")
     print(f"  Best iteration:      {metrics['best_iteration']}")
     print(f"  Pred range (val):    "
           f"{metrics['val_pred_min']:.2f} – {metrics['val_pred_max']:.2f}")
