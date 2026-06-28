@@ -5,10 +5,10 @@ rank.py — runtime entrypoint
 Constraints: no internet, no GPU, must complete in < 5 minutes.
 
 Pipeline:
-  1. FAISS semantic retrieval  (faiss_index.bin + jd_query_vector.npy)
-  2. Feature assembly          (features.parquet or candidates.jsonl)
-  3. XGBoost scoring           (model.xgb)
-  4. Honeypot filtering        (honeypot_ids.pkl)
+  1. Honeypot purge           (honeypot_ids.pkl)
+  2. FAISS top-K retrieval    (faiss_index.bin + jd_query_vector.npy)
+  3. XGBoost re-ranking       (model.xgb)
+  4. SHAP-based reasoning     (top 3 local drivers for final top 100)
   5. Top-100 CSV submission
 """
 
@@ -20,13 +20,13 @@ import gzip
 import json
 import pickle
 import re
-import sys
 import time
 from pathlib import Path
 
 import faiss
 import numpy as np
 import pandas as pd
+import shap
 import xgboost as xgb
 
 from runtime_pipeline.utils.features import (
@@ -42,11 +42,29 @@ try:
         return orjson.loads(line)
 
 except ImportError:
+
     def loads_json(line: str | bytes) -> dict:
         return json.loads(line)
 
+
 CANDIDATE_ID_PATTERN = re.compile(r"^CAND_[0-9]{7}$")
 TOP_K = 100
+FAISS_TOP_K = 2000
+
+FEATURE_LABELS = {
+    "years_of_experience": "Years of Experience",
+    "num_previous_jobs": "Previous Jobs Count",
+    "faiss_distance_to_jd": "Semantic Resume Match",
+    "num_skills_listed": "Skills Listed",
+    "max_assessment_score": "Assessment Score",
+    "recruiter_response_rate": "Recruiter Response Rate",
+    "interview_completion_rate": "Interview Completion Rate",
+    "github_activity_score": "GitHub Activity",
+    "days_since_active": "Days Since Last Active",
+    "profile_views_received_30d": "Profile Views (30d)",
+    "avg_job_duration_months": "Average Job Tenure",
+    "notice_period_days": "Notice Period",
+}
 
 
 def _resolve(path: str, fallbacks: list[str]) -> Path:
@@ -63,61 +81,40 @@ def load_honeypots(path: Path) -> set[str]:
         return pickle.load(fh)
 
 
-def load_faiss_similarity(
+def load_top_faiss_candidates(
     index_path: Path,
     jd_vector_path: Path,
     candidate_ids_path: Path,
-    top_k: int = 2000,
-) -> dict[str, float]:
-    """Compute JD cosine similarity for top-K indexed candidates."""
-    import time
-    
+    top_k: int = FAISS_TOP_K,
+) -> tuple[list[str], dict[str, float]]:
+    """Return top-K candidate IDs and similarity scores from the FAISS index."""
     t0 = time.perf_counter()
 
-    try:
-        print(f"[FAISS] Loading index from {index_path} …")
-        index = faiss.read_index(str(index_path))
-    except Exception as e:
-        raise RuntimeError(f"Failed to load FAISS index. File may be corrupted. Error: {e}")
+    print(f"[FAISS] Loading index from {index_path} …")
+    index = faiss.read_index(str(index_path))
+    jd_vector = np.load(jd_vector_path).astype(np.float32).reshape(1, -1)
 
-    try:
-        jd_vector = np.load(jd_vector_path).astype(np.float32).reshape(1, -1)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load JD vector. Error: {e}")
+    with candidate_ids_path.open(encoding="utf-8") as fh:
+        candidate_ids: list[str] = json.load(fh)
 
-    try:
-        with candidate_ids_path.open(encoding="utf-8") as fh:
-            candidate_ids: list[str] = json.load(fh)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load candidate IDs mapping. Error: {e}")
-
-    # Prevent out-of-bounds requests if index has fewer than 2000 vectors
     k = min(top_k, index.ntotal)
-    print(f"[FAISS] Searching {index.ntotal:,} vectors for top {k} …")
-    
-    try:
-        distances, indices = index.search(jd_vector, k=k)
-    except Exception as e:
-        raise RuntimeError(f"FAISS search execution failed. Error: {e}")
+    print(f"[FAISS] Searching {index.ntotal:,} vectors for top {k:,} …")
+    distances, indices = index.search(jd_vector, k=k)
 
-    similarity_map = {}
+    ranked_ids: list[str] = []
+    similarity_map: dict[str, float] = {}
     for faiss_id, score in zip(indices[0], distances[0]):
-        # Boundary validation: verify retrieved index IDs map cleanly
         if faiss_id < 0 or faiss_id >= len(candidate_ids):
-            print(f"  [WARN] FAISS returned out-of-bounds ID: {faiss_id}")
             continue
-        
         cid = candidate_ids[int(faiss_id)]
+        if cid in similarity_map:
+            continue
+        ranked_ids.append(cid)
         similarity_map[cid] = float(score)
 
     elapsed = time.perf_counter() - t0
-    print(f"[FAISS] Top-{k} retrieval completed in {elapsed:.4f}s")
-    
-    # Benchmark warning if we miss the target window
-    if elapsed > 2.0:
-        print(f"  [WARN] FAISS search exceeded 2.0s target envelope ({elapsed:.2f}s)")
-
-    return similarity_map
+    print(f"[FAISS] Top-{len(ranked_ids):,} retrieval completed in {elapsed:.3f}s")
+    return ranked_ids, similarity_map
 
 
 def load_features_parquet(path: Path) -> pd.DataFrame:
@@ -127,8 +124,10 @@ def load_features_parquet(path: Path) -> pd.DataFrame:
     return df
 
 
-def refresh_faiss_column(df: pd.DataFrame, similarity_map: dict[str, float]) -> pd.DataFrame:
-    """Overwrite faiss_distance_to_jd with live FAISS scores."""
+def refresh_faiss_column(
+    df: pd.DataFrame, similarity_map: dict[str, float]
+) -> pd.DataFrame:
+    """Overwrite faiss_distance_to_jd with live FAISS scores for selected candidates."""
     out = df.copy()
     out["faiss_distance_to_jd"] = out["candidate_id"].map(similarity_map)
     missing = int(out["faiss_distance_to_jd"].isna().sum())
@@ -141,10 +140,12 @@ def refresh_faiss_column(df: pd.DataFrame, similarity_map: dict[str, float]) -> 
 
 def build_features_from_jsonl(
     candidates_path: Path,
+    selected_ids: set[str],
     similarity_map: dict[str, float],
+    honeypots: set[str],
     metadata: dict | None,
 ) -> pd.DataFrame:
-    """Stream candidates.jsonl and build the feature matrix."""
+    """Stream candidates.jsonl(.gz) and build features for the selected non-honeypot IDs."""
     print(f"[PARSE] Streaming candidates from {candidates_path} …")
     open_fn = gzip.open if candidates_path.suffix.lower() == ".gz" else open
     mode = "rt" if candidates_path.suffix.lower() == ".gz" else "r"
@@ -159,26 +160,25 @@ def build_features_from_jsonl(
                 raw = loads_json(line)
             except Exception:
                 continue
+
             cid = raw.get("candidate_id")
             if not cid or not CANDIDATE_ID_PATTERN.match(cid):
                 continue
-            
-            # --- NEW FILTER ---
-            if cid not in similarity_map:
+            if cid in honeypots or cid not in selected_ids:
                 continue
-            # ------------------
 
-            faiss_score = similarity_map.get(cid, 0.0)
-            feat = build_features_from_raw(raw, faiss_score)
+            feat = build_features_from_raw(raw, similarity_map[cid])
             feat["candidate_id"] = cid
             rows.append(feat)
 
     if not rows:
-        raise RuntimeError(f"No valid candidates parsed from {candidates_path}")
+        raise RuntimeError(
+            f"No valid selected candidates parsed from {candidates_path}"
+        )
 
     imputed = apply_imputation(rows, metadata)
     df = pd.DataFrame(imputed)
-    print(f"  Parsed {len(df):,} candidates")
+    print(f"  Parsed {len(df):,} selected candidates from source JSONL")
     return df
 
 
@@ -189,40 +189,220 @@ def load_ranker(model_path: Path) -> xgb.XGBRanker:
     return ranker
 
 
+class RuntimeCandidateExplainer:
+    """Lightweight runtime SHAP explainer for final top-100 justifications."""
+
+    def __init__(self, ranker: xgb.XGBRanker):
+        booster = ranker.get_booster()
+        original_save_raw = booster.save_raw
+
+        def patched_save_raw(*args, **kwargs):
+            raw_bytes = original_save_raw(*args, **kwargs)
+            if isinstance(raw_bytes, (bytes, bytearray)) and raw_bytes.startswith(b"{"):
+                try:
+                    model_dict = json.loads(raw_bytes.decode("utf-8"))
+                    base_score = (
+                        model_dict.get("learner", {})
+                        .get("learner_model_param", {})
+                        .get("base_score")
+                    )
+                    if (
+                        isinstance(base_score, str)
+                        and base_score.startswith("[")
+                        and base_score.endswith("]")
+                    ):
+                        model_dict["learner"]["learner_model_param"]["base_score"] = (
+                            base_score.strip("[]")
+                        )
+                    return bytearray(json.dumps(model_dict).encode("utf-8"))
+                except Exception:
+                    return raw_bytes
+            return raw_bytes
+
+        booster.save_raw = patched_save_raw
+        self.explainer = shap.TreeExplainer(booster)
+
+    def get_top_drivers(self, candidates_df: pd.DataFrame) -> list[list[dict]]:
+        missing = [col for col in FEATURE_COLUMNS if col not in candidates_df.columns]
+        if missing:
+            raise ValueError(
+                "Candidates dataframe is missing required feature columns for SHAP: "
+                f"{missing}"
+            )
+
+        shap_values = self.explainer.shap_values(candidates_df[FEATURE_COLUMNS])
+        all_drivers: list[list[dict]] = []
+        for i in range(len(candidates_df)):
+            row_shap = shap_values[i]
+            top_indices = np.argsort(np.abs(row_shap))[-3:][::-1]
+            drivers: list[dict] = []
+            for idx in top_indices:
+                feature_key = FEATURE_COLUMNS[idx]
+                shap_val = float(row_shap[idx])
+                drivers.append(
+                    {
+                        "feature_key": feature_key,
+                        "feature": FEATURE_LABELS.get(feature_key, feature_key),
+                        "impact": "Positive Driver"
+                        if shap_val > 0
+                        else "Negative Driver",
+                        "magnitude": round(abs(shap_val), 4),
+                    }
+                )
+            all_drivers.append(drivers)
+        return all_drivers
+
+
 def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     X = df[FEATURE_COLUMNS].to_numpy(dtype=np.float32)
-    df = df.copy()
-    df["model_score"] = ranker.predict(X)
-    return df
+    scored = df.copy()
+    scored["model_score"] = ranker.predict(X)
+    return scored
 
 
-def select_top_k(
-    df: pd.DataFrame,
-    honeypots: set[str],
-    k: int = TOP_K,
-) -> pd.DataFrame:
-    pool = df[~df["candidate_id"].isin(honeypots)].copy()
-    pool = pool.sort_values(
+def clamp_non_negative(value: float) -> float:
+    return max(0.0, float(value))
+
+
+def describe_driver(row: pd.Series, driver: dict) -> str:
+    key = driver["feature_key"]
+    positive = driver["impact"] == "Positive Driver"
+    value = row[key]
+
+    if key == "faiss_distance_to_jd":
+        return (
+            f"deep semantic alignment with the JD ({float(value):.3f})"
+            if positive
+            else f"a softer semantic match signal ({float(value):.3f})"
+        )
+    if key == "years_of_experience":
+        return (
+            f"{float(value):.1f} years of relevant experience"
+            if positive
+            else f"limited experience depth at {float(value):.1f} years"
+        )
+    if key == "num_previous_jobs":
+        return (
+            f"useful career breadth across {int(value)} prior roles"
+            if positive
+            else f"higher role churn across {int(value)} prior jobs"
+        )
+    if key == "num_skills_listed":
+        return (
+            f"broad visible skill coverage ({int(value)} listed skills)"
+            if positive
+            else f"skill-list breadth that did not fully convert ({int(value)} listed skills)"
+        )
+    if key == "max_assessment_score":
+        return (
+            f"validated assessment strength ({float(value):.0f})"
+            if positive
+            else f"limited verified assessment evidence ({float(value):.0f})"
+        )
+    if key == "recruiter_response_rate":
+        return (
+            f"strong recruiter responsiveness ({clamp_non_negative(value):.0%})"
+            if positive
+            else f"weaker recruiter responsiveness ({clamp_non_negative(value):.0%})"
+        )
+    if key == "interview_completion_rate":
+        return (
+            f"solid interview follow-through ({clamp_non_negative(value):.0%})"
+            if positive
+            else f"inconsistent interview completion ({clamp_non_negative(value):.0%})"
+        )
+    if key == "github_activity_score":
+        return (
+            f"top-end GitHub activity ({float(value):.0f})"
+            if positive
+            else f"limited recent GitHub signal ({float(value):.0f})"
+        )
+    if key == "days_since_active":
+        return (
+            f"recent platform activity ({int(value)} days since active)"
+            if positive
+            else f"stale recent activity ({int(value)} days since active)"
+        )
+    if key == "profile_views_received_30d":
+        return (
+            f"recent inbound recruiter interest ({int(value)} profile views)"
+            if positive
+            else f"muted recent inbound attention ({int(value)} profile views)"
+        )
+    if key == "avg_job_duration_months":
+        return (
+            f"stable average tenure ({float(value):.1f} months per role)"
+            if positive
+            else f"shorter average tenure ({float(value):.1f} months per role)"
+        )
+    if key == "notice_period_days":
+        return (
+            f"a workable notice window ({int(value)} days)"
+            if positive
+            else f"a longer notice period ({int(value)} days)"
+        )
+    return (FEATURE_LABELS.get(key) or key).lower()
+
+
+def build_reasoning(row: pd.Series, drivers: list[dict]) -> str:
+    positive = [
+        describe_driver(row, d) for d in drivers if d["impact"] == "Positive Driver"
+    ]
+    negative = [
+        describe_driver(row, d) for d in drivers if d["impact"] == "Negative Driver"
+    ]
+    rank = int(row["rank"])
+
+    if positive and negative:
+        lead = positive[0]
+        support = f", reinforced by {positive[1]}" if len(positive) > 1 else ""
+        return f"Ranked #{rank} due to {lead}{support}, while {negative[0]} slightly capped the upside."
+    if len(positive) >= 3:
+        return (
+            f"Ranked #{rank} due to {positive[0]}, reinforced by {positive[1]}, "
+            f"and further lifted by {positive[2]}."
+        )
+    if len(positive) == 2:
+        return f"Ranked #{rank} due to {positive[0]}, reinforced by {positive[1]}."
+    if len(positive) == 1:
+        return f"Ranked #{rank} primarily due to {positive[0]}."
+    if len(negative) >= 2:
+        return (
+            f"Ranked #{rank} on overall model strength, even though {negative[0]} "
+            f"and {negative[1]} were the main drags."
+        )
+    if len(negative) == 1:
+        return f"Ranked #{rank} on overall model strength, despite {negative[0]}."
+    return (
+        f"Ranked #{rank} by the XGBoost student ranker on the overall feature profile."
+    )
+
+
+def attach_reasoning(top: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
+    print("[SHAP] Computing top-3 local drivers for final reasoning …")
+    explainer = RuntimeCandidateExplainer(ranker)
+    drivers = explainer.get_top_drivers(top)
+
+    enriched = top.copy()
+    enriched["reasoning"] = [
+        build_reasoning(enriched.iloc[i], drivers[i]) for i in range(len(enriched))
+    ]
+    return enriched
+
+
+def select_top_k(df: pd.DataFrame, k: int = TOP_K) -> pd.DataFrame:
+    ordered = df.sort_values(
         ["model_score", "candidate_id"],
         ascending=[False, True],
         kind="mergesort",
-    )
-    top = pool.head(k).reset_index(drop=True)
+    ).reset_index(drop=True)
+    top = ordered.head(k).copy()
     top["rank"] = top.index + 1
     return top
 
 
-def build_reasoning(row: pd.Series) -> str:
-    parts = [
-        f"semantic fit {row['faiss_distance_to_jd']:.3f}",
-        f"{row['years_of_experience']:.1f}y exp",
-        f"assessment {row['max_assessment_score']:.0f}",
-    ]
-    return "Ranked by XGBoost student ranker: " + ", ".join(parts) + "."
-
-
 def normalize_scores(scores: np.ndarray) -> np.ndarray:
-    """Ensure scores strictly decrease (submission validator requirement)."""
+    """Ensure scores strictly decrease to satisfy the submission validator."""
     out = []
     prev = None
     for s in scores:
@@ -235,18 +415,24 @@ def normalize_scores(scores: np.ndarray) -> np.ndarray:
 
 
 def write_submission(top: pd.DataFrame, out_path: Path) -> None:
+    if len(top) != TOP_K:
+        raise RuntimeError(f"Expected exactly {TOP_K} ranked rows, found {len(top)}")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     scores = normalize_scores(top["model_score"].to_numpy())
+
     with out_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
         writer.writerow(["candidate_id", "rank", "score", "reasoning"])
         for i, (_, row) in enumerate(top.iterrows()):
-            writer.writerow([
-                row["candidate_id"],
-                int(row["rank"]),
-                float(scores[i]),
-                build_reasoning(row),
-            ])
+            writer.writerow(
+                [
+                    row["candidate_id"],
+                    int(row["rank"]),
+                    float(scores[i]),
+                    row["reasoning"],
+                ]
+            )
     print(f"[OUT] Wrote {len(top)} rows to {out_path}")
 
 
@@ -255,19 +441,20 @@ def rank_candidates(
     out_path: str,
     artifacts_dir: str = "artifacts",
 ) -> pd.DataFrame:
-    """End-to-end ranking pipeline. Returns the top-K dataframe."""
+    """End-to-end ranking pipeline. Returns the top-K dataframe with reasoning."""
     t0 = time.perf_counter()
     art = Path(artifacts_dir)
 
     faiss_path = _resolve(
-        str(art / "faiss_index.bin"),
-        ["artifacts/artifacts/faiss_index.bin"],
+        str(art / "faiss_index.bin"), ["artifacts/artifacts/faiss_index.bin"]
     )
     jd_path = _resolve(str(art / "jd_query_vector.npy"), [])
     ids_path = _resolve(str(art / "candidate_ids.json"), [])
     model_path = _resolve(str(art / "model.xgb"), [])
     honeypot_path = _resolve(str(art / "honeypot_ids.pkl"), [])
-    features_path = _resolve(str(art / "features.parquet"), [str(art / "candidate_features.parquet")])
+    features_path = _resolve(
+        str(art / "features.parquet"), [str(art / "candidate_features.parquet")]
+    )
     metadata_path = _resolve(str(art / "feature_metadata.json"), [])
 
     for label, path in [
@@ -277,8 +464,7 @@ def rank_candidates(
         ("candidate IDs", ids_path),
     ]:
         if not path.exists():
-            print(f"Error: required artifact missing — {label}: {path}", file=sys.stderr)
-            sys.exit(1)
+            raise FileNotFoundError(f"Required artifact missing — {label}: {path}")
 
     metadata = None
     if metadata_path.exists():
@@ -288,38 +474,66 @@ def rank_candidates(
     honeypots = load_honeypots(honeypot_path)
     print(f"[LOAD] {len(honeypots)} honeypot IDs loaded")
 
-    if not jd_path.exists():
-        print(
-            "[WARN] jd_query_vector.npy not found — using faiss scores from features.parquet",
-            file=sys.stderr,
+    if jd_path.exists():
+        ranked_ids, similarity_map = load_top_faiss_candidates(
+            faiss_path,
+            jd_path,
+            ids_path,
+            top_k=FAISS_TOP_K,
         )
-        if not features_path.exists():
-            print(
-                "Error: need jd_query_vector.npy or features.parquet for FAISS scores",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        df = load_features_parquet(features_path)
-        similarity_map = dict(zip(df["candidate_id"], df["faiss_distance_to_jd"]))
     else:
-        # Inside rank_candidates, replace the `else:` block logic for parquet loading:
-        similarity_map = load_faiss_similarity(faiss_path, jd_path, ids_path, top_k=2000)
-        if features_path.exists():
-            df = load_features_parquet(features_path)
-            # --- NEW FILTER: Shrink DataFrame to only top 2000 ---
-            df = df[df["candidate_id"].isin(similarity_map.keys())].copy()
-            df = refresh_faiss_column(df, similarity_map)
-        else:
-            df = build_features_from_jsonl(
-                Path(candidates_path), similarity_map, metadata
+        if not features_path.exists():
+            raise FileNotFoundError(
+                "Need jd_query_vector.npy for FAISS retrieval or features.parquet for fallback"
             )
+        print(
+            "[WARN] jd_query_vector.npy not found — falling back to top candidates from stored faiss_distance_to_jd"
+        )
+        df_fallback = load_features_parquet(features_path)
+        df_fallback = df_fallback.sort_values(
+            ["faiss_distance_to_jd", "candidate_id"],
+            ascending=[False, True],
+            kind="mergesort",
+        ).head(FAISS_TOP_K)
+        ranked_ids = df_fallback["candidate_id"].tolist()
+        similarity_map = dict(
+            zip(df_fallback["candidate_id"], df_fallback["faiss_distance_to_jd"])
+        )
+
+    selected_ids = set(ranked_ids)
+
+    if features_path.exists():
+        df = load_features_parquet(features_path)
+        df = df[df["candidate_id"].isin(selected_ids)].copy()
+        df = df[~df["candidate_id"].isin(honeypots)].copy()
+        df = refresh_faiss_column(df, similarity_map)
+        print(
+            f"[FILTER] Retained {len(df):,} non-honeypot candidates after FAISS slice"
+        )
+    else:
+        df = build_features_from_jsonl(
+            Path(candidates_path),
+            selected_ids,
+            similarity_map,
+            honeypots,
+            metadata,
+        )
+        print(
+            f"[FILTER] Retained {len(df):,} non-honeypot candidates after parse-time purge"
+        )
+
+    if len(df) < TOP_K:
+        raise RuntimeError(
+            f"Need at least {TOP_K} candidates after filtering; only {len(df)} remain"
+        )
 
     ranker = load_ranker(model_path)
     scored = score_candidates(df, ranker)
-    top = select_top_k(scored, honeypots, k=TOP_K)
+    top = select_top_k(scored, k=TOP_K)
+    top = attach_reasoning(top, ranker)
 
     elapsed = time.perf_counter() - t0
-    print(f"\n[DONE] Ranked top {TOP_K} in {elapsed:.1f}s")
+    print(f"\n[DONE] Ranked top {TOP_K} in {elapsed:.2f}s")
     return top
 
 
@@ -328,7 +542,7 @@ def main() -> None:
     parser.add_argument(
         "--candidates",
         default="data/candidates.jsonl",
-        help="Path to candidates.jsonl (used when features.parquet is absent)",
+        help="Path to candidates.jsonl(.gz) when features.parquet is unavailable",
     )
     parser.add_argument("--out", default="submission.csv", help="Output submission CSV")
     parser.add_argument(
