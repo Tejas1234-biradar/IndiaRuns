@@ -252,12 +252,53 @@ class RuntimeCandidateExplainer:
             all_drivers.append(drivers)
         return all_drivers
 
-
+"""
 def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     X = df[FEATURE_COLUMNS].to_numpy(dtype=np.float32)
     scored = df.copy()
     scored["model_score"] = ranker.predict(X)
     return scored
+"""
+def score_candidates(df: pd.DataFrame, ranker: xgb.Booster) -> pd.DataFrame:
+    """
+    Score candidates using XGBoost and apply Min-Max normalization 
+    to raw margins to prevent tied/flat scores.
+    """
+    print("[SCORING] Running XGBoost predictions...")
+    
+    # Ensure we only pass the exact feature columns the model expects
+    dmatrix = xgb.DMatrix(df[FEATURE_COLUMNS])
+    
+    # 1. Output margin instead of probability to get wider uncompressed bounds
+    # 2. Lock iteration range to ensure we use the finalized tree split thresholds
+    raw_scores = ranker.predict(dmatrix, output_margin=True, iteration_range=(0, ranker.best_iteration + 1))
+    
+    # Apply Min-Max Normalization to stretch scores between 0 and 100
+    min_score = np.min(raw_scores)
+    max_score = np.max(raw_scores)
+    
+    if max_score > min_score:
+        # Enhances contrast between candidates
+        scaled_scores = ((raw_scores - min_score) / (max_score - min_score)) * 100
+    else:
+        # Fallback if variation is literally zero (highly unlikely)
+        scaled_scores = raw_scores
+        
+    df["score"] = scaled_scores
+    
+    # Sort descending to guarantee monotonic score decline
+    df = df.sort_values(by="score", ascending=False).reset_index(drop=True)
+    
+    # Tie-breaking logic: If scores are perfectly tied to the 4th decimal, 
+    # we penalize slightly based on FAISS distance to ensure distinct ranks.
+    if df["score"].duplicated().any():
+        print("  [WARN] Ties detected. Applying micro-penalties based on FAISS distance.")
+        # Subtract a microscopic fraction of the faiss distance to break the tie
+        df["score"] = df["score"] - (df["faiss_distance_to_jd"] * 0.0001)
+        df = df.sort_values(by="score", ascending=False).reset_index(drop=True)
+
+    print(f"  [SCORING] Max bound: {df['score'].max():.4f} | Min bound: {df['score'].min():.4f}")
+    return df
 
 
 def clamp_non_negative(value: float) -> float:
