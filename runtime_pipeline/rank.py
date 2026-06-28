@@ -259,47 +259,56 @@ def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     scored["model_score"] = ranker.predict(X)
     return scored
 """
-def score_candidates(df: pd.DataFrame, ranker: xgb.Booster) -> pd.DataFrame:
+def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     """
-    Score candidates using XGBoost and apply Min-Max normalization 
-    to raw margins to prevent tied/flat scores.
+    Score candidates using the trained XGBRanker and normalize scores to [0,100].
     """
     print("[SCORING] Running XGBoost predictions...")
-    
-    # Ensure we only pass the exact feature columns the model expects
-    dmatrix = xgb.DMatrix(df[FEATURE_COLUMNS])
-    
-    # 1. Output margin instead of probability to get wider uncompressed bounds
-    # 2. Lock iteration range to ensure we use the finalized tree split thresholds
-    raw_scores = ranker.predict(dmatrix, output_margin=True, iteration_range=(0, ranker.best_iteration + 1))
-    
-    # Apply Min-Max Normalization to stretch scores between 0 and 100
-    min_score = np.min(raw_scores)
-    max_score = np.max(raw_scores)
-    
-    if max_score > min_score:
-        # Enhances contrast between candidates
-        scaled_scores = ((raw_scores - min_score) / (max_score - min_score)) * 100
+
+    X = df[FEATURE_COLUMNS]
+
+    # Get raw margins from the model
+    if ranker.best_iteration is not None:
+        raw_scores = ranker.predict(
+            X,
+            output_margin=True,
+            iteration_range=(0, ranker.best_iteration + 1),
+        )
     else:
-        # Fallback if variation is literally zero (highly unlikely)
+        raw_scores = ranker.predict(
+            X,
+            output_margin=True,
+        )
+
+    raw_scores = np.asarray(raw_scores, dtype=np.float32)
+
+    min_score = raw_scores.min()
+    max_score = raw_scores.max()
+
+    if max_score > min_score:
+        scaled_scores = (raw_scores - min_score) / (max_score - min_score) * 100.0
+    else:
         scaled_scores = raw_scores
-        
-    df["score"] = scaled_scores
-    
-    # Sort descending to guarantee monotonic score decline
-    df = df.sort_values(by="score", ascending=False).reset_index(drop=True)
-    
-    # Tie-breaking logic: If scores are perfectly tied to the 4th decimal, 
-    # we penalize slightly based on FAISS distance to ensure distinct ranks.
-    if df["score"].duplicated().any():
-        print("  [WARN] Ties detected. Applying micro-penalties based on FAISS distance.")
-        # Subtract a microscopic fraction of the faiss distance to break the tie
-        df["score"] = df["score"] - (df["faiss_distance_to_jd"] * 0.0001)
-        df = df.sort_values(by="score", ascending=False).reset_index(drop=True)
 
-    print(f"  [SCORING] Max bound: {df['score'].max():.4f} | Min bound: {df['score'].min():.4f}")
-    return df
+    scored = df.copy()
+    scored["model_score"] = scaled_scores
 
+    if scored["model_score"].duplicated().any():
+        print("  [WARN] Ties detected. Applying FAISS tie-break.")
+        scored["model_score"] -= scored["faiss_distance_to_jd"] * 1e-4
+
+    scored = scored.sort_values(
+        ["model_score", "candidate_id"],
+        ascending=[False, True],
+        kind="mergesort",
+    ).reset_index(drop=True)
+
+    print(
+        f"  [SCORING] Max={scored['model_score'].max():.4f} "
+        f"Min={scored['model_score'].min():.4f}"
+    )
+
+    return scored
 
 def clamp_non_negative(value: float) -> float:
     return max(0.0, float(value))
@@ -436,7 +445,6 @@ def generate_dynamic_text(rank: int, top_drivers: list[str], cid: str) -> str:
     Generates linguistically diverse reasonings by combining random-seeded 
     synonym arrays to prevent cookie-cutter template patterns.
     """
-    import jashash # or standard hash if jashash isn't native, let's use python built-in hash
     # Use candidate ID hash as seed to maintain deterministic variance across runs
     seed = abs(hash(cid)) 
     
@@ -477,29 +485,28 @@ def generate_dynamic_text(rank: int, top_drivers: list[str], cid: str) -> str:
     reasoning = reasoning.replace("nan", "stable metrics").replace("  ", " ")
     return reasoning
 
-def attach_reasoning(df: pd.DataFrame, ranker: xgb.Booster) -> pd.DataFrame:
-    """Computes SHAP values for the top 100 and applies dynamic text variance."""
-    print("[REASONING] Constructing diverse human-reviewable explanations...")
-    
-    # Run lightweight SHAP on CPU for top 100 only
-    explainer = shap.TreeExplainer(ranker)
-    dmatrix_df = df[FEATURE_COLUMNS].head(100)
-    shap_values = explainer.shap_values(dmatrix_df)
-    
-    reasonings = []
-    for idx, row in df.head(100).iterrows():
-        # Find features with highest absolute SHAP impact
-        row_shap = shap_values[idx] if isinstance(shap_values, np.ndarray) else shap_values.values[idx]
-        top_indices = np.argsort(np.abs(row_shap))[::-1]
-        top_features = [FEATURE_COLUMNS[i] for i in top_indices[:2]]
-        
-        # Inject dynamic text matching the schema variables
-        text = generate_dynamic_text(idx + 1, top_features, row["candidate_id"])
-        reasonings.append(text)
-        
-    df.loc[:99, "reasoning"] = reasonings
-    return df
+def attach_reasoning(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
+    print("[REASONING] Constructing explanations...")
 
+    explainer = RuntimeCandidateExplainer(ranker)
+
+    drivers = explainer.get_top_drivers(df.head(100))
+
+    reasonings = []
+
+    for i, (_, row) in enumerate(df.head(100).iterrows()):
+        top_features = [d["feature_key"] for d in drivers[i]]
+        reasonings.append(
+            generate_dynamic_text(
+                int(row["rank"]),
+                top_features,
+                row["candidate_id"],
+            )
+        )
+
+    df = df.copy()
+    df.loc[df.index[:100], "reasoning"] = reasonings
+    return df
 
 def select_top_k(df: pd.DataFrame, k: int = TOP_K) -> pd.DataFrame:
     ordered = df.sort_values(

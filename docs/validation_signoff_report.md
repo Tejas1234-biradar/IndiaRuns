@@ -5,10 +5,10 @@
 - **Status:** PASS
 
 ## 2. Score Distribution Audit
-- **Max Score:** 1.8769
-- **Min Score:** 1.6069
-- **Variance:** 0.0046
-- **Range Spread:** 0.2700
+- **Max Score:** 99.9999
+- **Min Score:** 92.1704
+- **Variance:** 3.8338
+- **Range Spread:** 7.8295
 - **Status:** PASS (Confirmed realistic monotonic distribution)
 
 ## 3. Behavioral Weighting (Keyword Stuffer check)
