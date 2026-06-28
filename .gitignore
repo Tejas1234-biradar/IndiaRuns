@@ -24,10 +24,7 @@ Thumbs.db
 # Generated pipeline artifacts (large files >100MB)
 artifacts/faiss_index.bin
 artifacts/candidates_parsed.jsonl
-artifacts/candidate_embeddings.npy
-artifacts/teacher_sample.jsonl
-
-offline_pipeline/eda_signals/reports/
+artifacts/artifacts/
 
 # Raw input data (465MB)
 data/

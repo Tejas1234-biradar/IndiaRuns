@@ -11,11 +11,10 @@ ENV PYTHONUNBUFFERED=1 \
 COPY requirements_runtime.txt ./
 RUN pip install --no-cache-dir -r requirements_runtime.txt
 
-COPY rank.py ./
+# Copy runtime code and pre-built artifacts
+COPY rank.py .
 COPY runtime_pipeline/ ./runtime_pipeline/
-COPY tests/validate_submission.py ./tests/validate_submission.py
-COPY docker/entrypoint.sh ./docker/entrypoint.sh
-
+COPY tests/ ./tests/
 COPY artifacts/model.xgb ./artifacts/model.xgb
 COPY artifacts/faiss_index.bin ./artifacts/faiss_index.bin
 COPY artifacts/candidate_ids.json ./artifacts/candidate_ids.json

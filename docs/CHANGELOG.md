@@ -4,19 +4,6 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
-## [2026-06-28] — created dynamic phrasing engine
-
-### What changed
-- Created `phrasing_engine.py` with `GRAMMAR_MATRIX`.
-- Mapped key behavioral/technical features to positive/negative text blocks.
-- Enforced feature-specific fallbacks to eliminate generic text generation.
-
-### Why
-This establishes the foundational dictionary required to dynamically generate non-templated text based on SHAP feature impacts.This engine ensures the text justifies the ranker's decision smoothly while strictly avoiding hallucinated or boilerplate text.
-
-### Scope
-explain
-
 ## [2026-06-28] — intialized local tree explainer
 
 ### What changed
