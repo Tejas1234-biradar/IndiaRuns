@@ -1,15 +1,12 @@
 """
-offline_pipeline/explainer/phrasing_engine.py
-
-Task 3.6 - Deterministic Phrasing Engine
 Compiles raw SHAP signals and raw numeric features into customized, 
 non-templated natural language justifications for recruiters.
 """
 
 import random
 
-# Checklist [x]: Define a wide vocabulary matrix of descriptive grammar blocks
-# Checklist [x]: Ensure explicit mentions of dynamic numerical values ({val})
+# Define a wide vocabulary matrix of descriptive grammar blocks
+# Ensure explicit mentions of dynamic numerical values ({val})
 GRAMMAR_MATRIX = {
     "Years of Experience": {
         "Positive Driver": [
@@ -72,3 +69,54 @@ GRAMMAR_MATRIX = {
         ]
     }
 }
+
+# Map human-readable names back to dataframe column names for value extraction
+REVERSE_MAPPING = {
+    "Years of Experience": "years_of_experience",
+    "Semantic Resume Match": "faiss_distance_to_jd",
+    "GitHub Activity Level": "github_activity_score",
+    "Availability/Notice Period": "notice_period_days",
+    "Average Job Tenure": "avg_job_duration_months",
+    "Skills Listed": "num_skills_listed"
+}
+
+def generate_justification(candidate_row: dict, top_drivers: list[dict]) -> str:
+    phrases = []
+    
+    for driver in top_drivers:
+        feature_name = driver["feature"]
+        impact = driver["impact"]
+        
+        # Safely extract the exact numerical value from the candidate's raw row
+        col_name = REVERSE_MAPPING.get(feature_name)
+        raw_val = candidate_row.get(col_name, "N/A")
+        
+        # Format the number for readability (e.g., 2.0 -> 2)
+        if isinstance(raw_val, float):
+            raw_val = round(raw_val, 1) if raw_val % 1 != 0 else int(raw_val)
+            
+        # Fetch the grammar block and dynamically inject the value
+        blocks = GRAMMAR_MATRIX.get(feature_name, {}).get(impact)
+        
+        if blocks:
+            # Randomly select a phrasing block to increase string variance
+            selected_block = random.choice(blocks)
+            phrases.append(selected_block.format(val=raw_val))
+        else:
+            # Fallback syntax mapped specifically to the feature name (No generic "Good candidate" fallbacks)
+            modifier = "strong" if impact == "Positive Driver" else "concerning"
+            phrases.append(f"{modifier} metrics in {feature_name.lower()} ({raw_val})")
+
+    # Syntactic Blending Rules
+    if len(phrases) == 3:
+        justification = f"Driven primarily by {phrases[0]}, coupled with {phrases[1]}, and {phrases[2]}."
+    elif len(phrases) == 2:
+        justification = f"Driven primarily by {phrases[0]}, as well as {phrases[1]}."
+    elif len(phrases) == 1:
+        justification = f"Driven primarily by {phrases[0]}."
+    else:
+        # Failsafe if SHAP returns nothing
+        justification = "Candidate evaluation generated based on cumulative baseline metrics."
+
+    # Capitalize first letter strictly
+    return justification[0].upper() + justification[1:]
