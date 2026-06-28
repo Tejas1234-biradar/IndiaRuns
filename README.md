@@ -15,6 +15,19 @@ Run on your own machine with GPU/internet access. Produces three artifacts:
 Runs inside a Docker sandbox. No internet, no GPU, must finish in under 5 minutes.
 Entrypoint: `runtime_pipeline/rank.py`
 
+## Interactive sandbox
+A Streamlit sandbox is available at `streamlit_app.py` for manual review/demo flows using an input slice of up to 100 candidates from the original artifact pool.
+
+Local launch:
+```bash
+streamlit run streamlit_app.py
+```
+
+Deployment notes:
+- Streamlit Cloud / app file: `streamlit_app.py`
+- deployment guide: `docs/SANDBOX_DEPLOYMENT.md`
+- bundled sample input: `data/sample_candidate_ids_100.csv`
+
 ### Docker workflow
 Build the runtime image from the repository root:
 

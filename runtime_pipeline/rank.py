@@ -288,6 +288,7 @@ class RuntimeCandidateExplainer:
             all_drivers.append(drivers)
         return all_drivers
 
+
 """
 def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     X = df[FEATURE_COLUMNS].to_numpy(dtype=np.float32)
@@ -295,6 +296,8 @@ def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     scored["model_score"] = ranker.predict(X)
     return scored
 """
+
+
 def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     """
     Score candidates using the trained XGBRanker and normalize scores to [0,100].
@@ -345,6 +348,7 @@ def score_candidates(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     )
 
     return scored
+
 
 def clamp_non_negative(value: float) -> float:
     return max(0.0, float(value))
@@ -463,6 +467,7 @@ def build_reasoning(row: pd.Series, drivers: list[dict]) -> str:
         f"Ranked #{rank} by the XGBoost student ranker on the overall feature profile."
     )
 
+
 """
 def attach_reasoning(top: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     print("[SHAP] Computing top-3 local drivers for final reasoning …")
@@ -476,50 +481,54 @@ def attach_reasoning(top: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     return enriched
 """
 
+
 def generate_dynamic_text(rank: int, top_drivers: list[str], cid: str) -> str:
     """
-    Generates linguistically diverse reasonings by combining random-seeded 
+    Generates linguistically diverse reasonings by combining random-seeded
     synonym arrays to prevent cookie-cutter template patterns.
     """
     # Use candidate ID hash as seed to maintain deterministic variance across runs
-    seed = abs(hash(cid)) 
-    
+    seed = abs(hash(cid))
+
     openers = [
         f"Secured rank #{rank} due to an exceptional display of",
         f"Placed at tier #{rank} owing to robust core indicators in",
         f"Maintains position #{rank} following strong behavioral verification across",
-        f"Positioned at rank #{rank}, heavily driven by standout metrics in"
+        f"Positioned at rank #{rank}, heavily driven by standout metrics in",
     ]
-    
+
     connectors = [
         "coupled with verified strength in",
         "complemented by significant performance markers in",
         "alongside an impressive trajectory within",
-        "integrated with strong outcomes in"
+        "integrated with strong outcomes in",
     ]
-    
+
     closers = [
         "which collectively outpace the cohort baseline.",
         "satisfying elite profile criteria cleanly.",
         "rendering this profile a highly resilient match.",
-        "solidifying behavioral alignment with the engineering mandate."
+        "solidifying behavioral alignment with the engineering mandate.",
     ]
-    
+
     # Safely unpack top features (pad if fewer than expected)
     f1 = top_drivers[0] if len(top_drivers) > 0 else "general domain expertise"
     f2 = top_drivers[1] if len(top_drivers) > 1 else "technical assessment continuity"
-    
+
     # Select phrases deterministically based on candidate seed
     opener = openers[seed % len(openers)]
     connector = connectors[(seed >> 1) % len(connectors)]
     closer = closers[(seed >> 2) % len(closers)]
-    
+
     # Formulate natural sentence structure
-    reasoning = f"{opener} {f1.replace('_', ' ')}, {connector} {f2.replace('_', ' ')} {closer}"
-    
+    reasoning = (
+        f"{opener} {f1.replace('_', ' ')}, {connector} {f2.replace('_', ' ')} {closer}"
+    )
+
     # Sanity clean code flags or array boundaries
     reasoning = reasoning.replace("nan", "stable metrics").replace("  ", " ")
     return reasoning
+
 
 def attach_reasoning(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     print("[REASONING] Constructing explanations...")
@@ -543,6 +552,7 @@ def attach_reasoning(df: pd.DataFrame, ranker: xgb.XGBRanker) -> pd.DataFrame:
     df = df.copy()
     df.loc[df.index[:100], "reasoning"] = reasonings
     return df
+
 
 def select_top_k(df: pd.DataFrame, k: int = TOP_K) -> pd.DataFrame:
     ordered = df.sort_values(
