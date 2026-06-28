@@ -12,7 +12,8 @@ build/
 .env
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 *~
 
@@ -20,9 +21,10 @@ build/
 .DS_Store
 Thumbs.db
 
-# Generated pipeline artifacts
-artifacts/
-!artifacts/.gitkeep
+# Generated pipeline artifacts (large files >100MB)
+artifacts/faiss_index.bin
+artifacts/candidates_parsed.jsonl
+artifacts/artifacts/
 
 # Raw input data (465MB)
 data/
