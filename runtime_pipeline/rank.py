@@ -162,6 +162,12 @@ def build_features_from_jsonl(
             cid = raw.get("candidate_id")
             if not cid or not CANDIDATE_ID_PATTERN.match(cid):
                 continue
+            
+            # --- NEW FILTER ---
+            if cid not in similarity_map:
+                continue
+            # ------------------
+
             faiss_score = similarity_map.get(cid, 0.0)
             feat = build_features_from_raw(raw, faiss_score)
             feat["candidate_id"] = cid
@@ -296,9 +302,12 @@ def rank_candidates(
         df = load_features_parquet(features_path)
         similarity_map = dict(zip(df["candidate_id"], df["faiss_distance_to_jd"]))
     else:
-        similarity_map = load_faiss_similarity(faiss_path, jd_path, ids_path)
+        # Inside rank_candidates, replace the `else:` block logic for parquet loading:
+        similarity_map = load_faiss_similarity(faiss_path, jd_path, ids_path, top_k=2000)
         if features_path.exists():
             df = load_features_parquet(features_path)
+            # --- NEW FILTER: Shrink DataFrame to only top 2000 ---
+            df = df[df["candidate_id"].isin(similarity_map.keys())].copy()
             df = refresh_faiss_column(df, similarity_map)
         else:
             df = build_features_from_jsonl(
