@@ -1,0 +1,83 @@
+{
+    "role_name": "Senior AI Engineer \u2014 Founding Team",
+    "experience_range_years": [
+        5,
+        9
+    ],
+    "core_technical_requirements": [
+        "Deep technical depth in modern ML systems",
+        "Embeddings",
+        "Retrieval systems",
+        "Ranking systems",
+        "LLMs",
+        "Fine-tuning",
+        "Production experience with embeddings-based retrieval systems (e.g., sentence-transformers, OpenAI embeddings, BGE, E5)",
+        "Production experience with vector databases or hybrid search infrastructure (e.g., Pinecone, Weaviate, Qdrant, Milvus, OpenSearch, Elasticsearch, FAISS)",
+        "Strong Python",
+        "Hands-on experience designing evaluation frameworks for ranking systems (e.g., NDCG, MRR, MAP, offline-to-online correlation, A/B test interpretation)",
+        "Hybrid retrieval",
+        "LLM-based re-ranking",
+        "Setting up evaluation infrastructure (offline benchmarks, online A/B testing, recruiter-feedback loops)"
+    ],
+    "hidden_text_markers": [
+        "Scrappy product-engineering attitude",
+        "Willing to ship suboptimal code quickly to learn from real users",
+        "Comfortable with a role where the JD changes every six months",
+        "Willing to think about product, recruiter workflows, and evaluation frameworks",
+        "Capable of operating in both 'researcher' and 'shipper' modes, with a slight tilt towards 'shipper'",
+        "Drives long-term architecture",
+        "Mentors junior hires",
+        "Works closely with Product Managers",
+        "Culture-fit matters more than skills-fit at this stage",
+        "Works async-first and writes a lot",
+        "Disagrees openly and decides quickly",
+        "Moves fast and breaks internal assumptions",
+        "Has strong opinions about retrieval (hybrid vs dense), evaluation (offline vs online), and LLM integration (when to fine-tune vs prompt)",
+        "Can defend opinions with reference to systems they actually built"
+    ],
+    "explicit_anti_patterns": [
+        "Candidates seeking well-scoped roles with defined ladders (e.g., from Google or Meta)",
+        "Candidates who want to 'just code' without thinking about product or workflows",
+        "Candidates whose career has been spent in pure research environments (academic labs, research-only roles) without production deployment",
+        "Candidates whose 'AI experience' is primarily recent (under 12 months) projects using LangChain to call OpenAI, without substantial pre-LLM-era ML production experience",
+        "Senior engineers who haven't written production code in the last 18 months due to 'architecture' or 'tech lead' roles",
+        "Title-chasers optimizing for promotions by switching companies every 1.5 years",
+        "Framework enthusiasts whose primary focus is on using hot frameworks rather than systems thinking",
+        "Candidates whose entire career has been at consulting firms (TCS, Infosys, Wipro, Accenture, Cognizant, Capgemini, etc.) without prior product-company experience",
+        "Candidates whose primary expertise is computer vision, speech, or robotics without significant NLP/IR exposure",
+        "Candidates whose work has been entirely on closed-source proprietary systems for 5+ years without external validation (papers, talks, open-source)",
+        "Candidates who need a stable, mature codebase to be productive"
+    ],
+    "optional_preferred_requirements": [
+        "LLM fine-tuning experience (LoRA, QLoRA, PEFT)",
+        "Experience with learning-to-rank models (XGBoost-based or neural)",
+        "Prior exposure to HR-tech, recruiting tech, or marketplace products",
+        "Background in distributed systems or large-scale inference optimization",
+        "Open-source contributions in the AI/ML space"
+    ],
+    "logistics_constraints": {
+        "preferred_locations": [
+            "Pune",
+            "Noida",
+            "Hyderabad",
+            "Mumbai",
+            "Delhi NCR",
+            "Tier-1 Indian cities"
+        ],
+        "availability_requirements": [
+            "Sub-30-day notice period (preferred)",
+            "Willingness to buy out up to 30 days of notice period",
+            "Active on Redrob platform or clear signal of being in the job market",
+            "Willingness for quarterly travel for offsites"
+        ]
+    },
+    "algorithmic_rules": {
+        "keyword_trap_mitigation_strategy": "Avoid keyword traps by reasoning about the gap between what the JD says and what it means. A candidate's career history building a recommendation system at a product company is a fit, even without specific AI keywords. A candidate with all AI keywords but an irrelevant title (e.g., Marketing Manager) is not a fit. Focus on demonstrated experience and impact over keyword matching.",
+        "behavioural_signals": [
+            "Low activity on platform (e.g., hasn't logged in for 6 months)",
+            "Low recruiter response rate (e.g., 5%)",
+            "Not actively in the job market"
+        ]
+    },
+    "synthetic_ideal_candidate_embedding_string": "I am a Senior AI Engineer with 6-8 years of total experience, including 4-5 years in applied ML/AI roles at product companies, not pure services. I have successfully shipped at least one end-to-end ranking, search, or recommendation system to real users at meaningful scale, demonstrating deep technical depth in modern ML systems including embeddings, retrieval, ranking, LLMs, and fine-tuning. I possess production experience with embeddings-based retrieval systems (e.g., sentence-transformers, OpenAI embeddings, BGE, E5) and vector databases (e.g., Pinecone, Weaviate, Qdrant, Milvus, OpenSearch, Elasticsearch, FAISS), with a proven ability to handle embedding drift, index refresh, and retrieval-quality regression in production. My strong Python skills are complemented by hands-on experience designing and interpreting evaluation frameworks for ranking systems, such as NDCG, MRR, MAP, offline-to-online correlation, and A/B testing. I embody a scrappy product-engineering attitude, prioritizing shipping quickly to learn from users, even if the initial ML solution is suboptimal, and I am comfortable with the dynamic nature of a Series A startup. I have strong, defensible opinions on retrieval strategies (hybrid vs dense), evaluation methodologies (offline vs online), and LLM integration (fine-tuning vs prompting), backed by systems I've personally built. I am a proactive problem-solver, capable of driving long-term architecture, mentoring junior engineers, and collaborating closely with product managers. I thrive in an async-first, writing-heavy environment where open disagreement leads to quick decisions, and I am comfortable with a fast-paced, evolving codebase. I am located in or willing to relocate to Noida or Pune, and I am actively engaged in the job market."
+}

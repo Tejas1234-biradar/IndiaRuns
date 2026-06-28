@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "sample_size": 50,
+  "ids_present": 50,
+  "ids_missing": 0,
+  "missing_id_list": [],
+  "field_checks_run": 600,
+  "field_errors": [],
+  "field_error_count": 0,
+  "key_errors": [],
+  "total_parsed_records": 100000
+}

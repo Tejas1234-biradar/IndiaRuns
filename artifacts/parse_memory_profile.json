@@ -1,0 +1,48 @@
+{
+  "parsed_count": 100000,
+  "skipped_count": 0,
+  "total_elapsed_sec": 26.82,
+  "avg_records_per_sec": 3728,
+  "memory_snapshots": [
+    {
+      "checkpoint_pct": 0,
+      "records_parsed": 1,
+      "current_memory_mb": 0.05,
+      "peak_memory_mb": 0.09,
+      "elapsed_sec": 0.0,
+      "records_per_sec": 634
+    },
+    {
+      "checkpoint_pct": 25,
+      "records_parsed": 25000,
+      "current_memory_mb": 0.06,
+      "peak_memory_mb": 0.19,
+      "elapsed_sec": 7.22,
+      "records_per_sec": 3462
+    },
+    {
+      "checkpoint_pct": 50,
+      "records_parsed": 50000,
+      "current_memory_mb": 0.06,
+      "peak_memory_mb": 0.19,
+      "elapsed_sec": 13.95,
+      "records_per_sec": 3584
+    },
+    {
+      "checkpoint_pct": 75,
+      "records_parsed": 75000,
+      "current_memory_mb": 0.06,
+      "peak_memory_mb": 0.2,
+      "elapsed_sec": 20.32,
+      "records_per_sec": 3690
+    },
+    {
+      "checkpoint_pct": 100,
+      "records_parsed": 100000,
+      "current_memory_mb": 0.07,
+      "peak_memory_mb": 0.21,
+      "elapsed_sec": 26.82,
+      "records_per_sec": 3728
+    }
+  ]
+}
