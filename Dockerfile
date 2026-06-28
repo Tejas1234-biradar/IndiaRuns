@@ -2,8 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY requirements_runtime.txt .
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    ARTIFACTS_DIR=/app/artifacts \
+    CANDIDATES_PATH=data/candidates.jsonl \
+    OUTPUT_PATH=/output/output.csv
+
+COPY requirements_runtime.txt ./
 RUN pip install --no-cache-dir -r requirements_runtime.txt
 
 # Copy runtime code and pre-built artifacts
@@ -16,9 +21,8 @@ COPY artifacts/candidate_ids.json ./artifacts/candidate_ids.json
 COPY artifacts/honeypot_ids.pkl ./artifacts/honeypot_ids.pkl
 COPY artifacts/features.parquet ./artifacts/features.parquet
 COPY artifacts/feature_metadata.json ./artifacts/feature_metadata.json
+COPY artifacts/jd_query_vector.npy ./artifacts/jd_query_vector.npy
 
-# Optional: JD query vector for live FAISS scoring (generate offline via jd_embedder.py)
-# COPY artifacts/jd_query_vector.npy ./artifacts/jd_query_vector.npy
+RUN chmod +x /app/docker/entrypoint.sh && mkdir -p /output
 
-# Default entrypoint
-ENTRYPOINT ["python", "rank.py"]
+ENTRYPOINT ["/app/docker/entrypoint.sh"]

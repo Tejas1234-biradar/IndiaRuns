@@ -1,0 +1,13 @@
+.git
+.github
+.pytest_cache
+.venv
+.vscode
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+reports
+offline_pipeline
+submission.csv
