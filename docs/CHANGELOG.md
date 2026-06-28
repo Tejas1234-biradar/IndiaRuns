@@ -4,6 +4,18 @@ All notable changes to IndiaRuns are documented here, most recent first.
 Format: date, title, what changed, why, scope.
 
 ---
+## [2026-06-28] — intialized local tree explainer
+
+### What changed
+- Created `shap_explainer.py`.
+- Benchmarks extraction time over 100 rows and prints sample outputs.
+
+### Why
+Ensures the SHAP tree extraction adds virtually zero overhead to the final 5-minute offline ranking SLA.
+
+### Scope
+explain
+
 ## [2026-06-26] — updated labeling prompt and labeled 3000 samples
 
 ### What changed
