@@ -130,9 +130,6 @@ def rank_candidate_slice(
     )
 
     for label, path in [
-        ("FAISS index", faiss_path),
-        ("JD vector", jd_path),
-        ("candidate IDs", ids_path),
         ("XGBoost model", model_path),
         ("honeypot IDs", honeypot_path),
         ("features parquet", features_path),
@@ -142,13 +139,21 @@ def rank_candidate_slice(
                 f"Required sandbox artifact missing — {label}: {path}"
             )
 
-    honeypots = load_honeypots(honeypot_path)
-    similarity_map, missing_ids = compute_slice_similarity(
-        candidate_ids, faiss_path, jd_path, ids_path
-    )
+    has_live_faiss = faiss_path.exists() and jd_path.exists() and ids_path.exists()
 
-    df = load_selected_features_parquet(features_path, list(similarity_map.keys()))
-    df = refresh_faiss_column(df, similarity_map)
+    honeypots = load_honeypots(honeypot_path)
+    if has_live_faiss:
+        similarity_map, missing_ids = compute_slice_similarity(
+            candidate_ids, faiss_path, jd_path, ids_path
+        )
+        df = load_selected_features_parquet(features_path, list(similarity_map.keys()))
+        df = refresh_faiss_column(df, similarity_map)
+        similarity_source = "live_faiss"
+    else:
+        df = load_selected_features_parquet(features_path, candidate_ids)
+        found_ids = set(df["candidate_id"].tolist())
+        missing_ids = [cid for cid in candidate_ids if cid not in found_ids]
+        similarity_source = "precomputed_feature_store"
 
     honeypot_ids = sorted(
         set(df.loc[df["candidate_id"].isin(honeypots), "candidate_id"].tolist())
@@ -173,5 +178,6 @@ def rank_candidate_slice(
         "ranked_candidates": len(result),
         "missing_candidates": missing_ids,
         "honeypot_candidates": honeypot_ids,
+        "similarity_source": similarity_source,
     }
     return result, metadata
