@@ -27,8 +27,8 @@ artifacts/candidates_parsed.jsonl
 artifacts/artifacts/
 
 # Raw input data (465MB)
-data/
-!data/sample_candidates.json
+data/*
+!data/sample_candidate_ids_100.csv
 !data/.gitkeep
 
 # Test caches
