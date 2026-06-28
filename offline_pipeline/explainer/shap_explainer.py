@@ -35,3 +35,41 @@ class CandidateExplainer:
         
         # Initialize lightweight TreeExplainer
         self.explainer = shap.TreeExplainer(self.model)
+    
+    def get_top_drivers(self, candidates_df: pd.DataFrame) -> list[list[dict]]:
+        """
+        Compute local SHAP values for the final top 100 rows
+        """
+        # Ensure we only pass numeric feature columns to SHAP
+        feature_cols = list(FEATURE_MAPPING.keys())
+        X_matrix = candidates_df[feature_cols]
+        
+        # Compute SHAP values (returns numpy array of shape [n_samples, n_features])
+        shap_values = self.explainer.shap_values(X_matrix)
+        
+        all_drivers = []
+        
+        for i in range(len(candidates_df)):
+            row_shap = shap_values[i]
+            
+            # Extract index locations of top 3 most influential features
+            # argsort on absolute values to get the strongest drivers (both positive and negative)
+            top_3_indices = np.argsort(np.abs(row_shap))[-3:][::-1]
+            
+            candidate_drivers = []
+            for idx in top_3_indices:
+                raw_feature_name = feature_cols[idx]
+                shap_val = float(row_shap[idx])
+                
+                # Normalize feature contribution directions
+                direction = "Positive Driver" if shap_val > 0 else "Negative Driver"
+                
+                candidate_drivers.append({
+                    "feature": FEATURE_MAPPING.get(raw_feature_name, raw_feature_name),
+                    "impact": direction,
+                    "magnitude": round(abs(shap_val), 4)
+                })
+                
+            all_drivers.append(candidate_drivers)
+            
+        return all_drivers
