@@ -73,3 +73,27 @@ class CandidateExplainer:
             all_drivers.append(candidate_drivers)
             
         return all_drivers
+
+if __name__ == "__main__":
+    # Benchmark explainer computation overhead
+    print("Loading model and dataset for benchmarking...")
+    
+    # Load model and top 100 rows of training data
+    test_explainer = CandidateExplainer("artifacts/model.xgb")
+    df = pd.read_parquet("artifacts/training_dataset.parquet").head(100)
+    
+    print(f"Benchmarking SHAP extraction for {len(df)} candidates...")
+    start_time = time.perf_counter()
+    
+    drivers = test_explainer.get_top_drivers(df)
+    
+    end_time = time.perf_counter()
+    elapsed_ms = (end_time - start_time) * 1000
+    
+    print(f"Extraction completed in {elapsed_ms:.2f} ms")
+    print(f"Average time per candidate: {elapsed_ms / len(df):.2f} ms")
+    
+    # Sanity check output
+    print("\nSample Output for Top Candidate:")
+    for driver in drivers[0]:
+        print(f" - {driver['impact']}: {driver['feature']} (Magnitude: {driver['magnitude']})")
