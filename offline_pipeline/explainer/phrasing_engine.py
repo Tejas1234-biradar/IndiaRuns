@@ -129,7 +129,7 @@ if __name__ == "__main__":
     
     # Load dependencies
     explainer = CandidateExplainer("artifacts/model.xgb")
-    df = pd.read_parquet("training_dataset.parquet")
+    df = pd.read_parquet("artifacts/training_dataset.parquet")
     
     # Sort by a target proxy to get a mix of good/bad candidates
     df = df.sort_values(by="years_of_experience", ascending=False).head(5)

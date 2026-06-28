@@ -15,6 +15,34 @@ Run on your own machine with GPU/internet access. Produces three artifacts:
 Runs inside a Docker sandbox. No internet, no GPU, must finish in under 5 minutes.
 Entrypoint: `runtime_pipeline/rank.py`
 
+### Docker workflow
+Build the runtime image from the repository root:
+
+```bash
+docker build -t indiaruns-runtime .
+```
+
+Run a single container and write the submission to a host-mounted output directory:
+
+```bash
+docker run --rm \
+  -v /absolute/path/to/output:/output \
+  indiaruns-runtime
+```
+
+This generates `/absolute/path/to/output/output.csv` and validates it before the container exits.
+
+Optional environment overrides:
+
+```bash
+docker run --rm \
+  -v /absolute/path/to/output:/output \
+  -e OUTPUT_PATH=/output/team_123.csv \
+  -e ARTIFACTS_DIR=/app/artifacts \
+  -e CANDIDATES_PATH=data/candidates.jsonl \
+  indiaruns-runtime
+```
+
 ## Setup
 
 Offline environment:
