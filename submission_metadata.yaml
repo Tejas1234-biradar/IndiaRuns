@@ -1,0 +1,72 @@
+# Redrob Hackathon submission metadata for the IndiaRuns project.
+# Replace the obvious TEAM / CONTACT / LINK placeholders before final submission.
+# All project-specific technical fields below are pre-filled from this repository.
+
+team_name: "IndiaRuns"
+
+primary_contact:
+  name: "Tejas Biradar"
+  email: "biradartejas842@gmail.com"
+  phone: "+91-9637982831"
+
+team_members:
+  - name: "Prisha Sus"
+    email: "prisha.sus24@vit.edu"
+    role: "M1 - NLP & Retrieval Engineer"
+  - name: "Divija Shah"
+    email: "divija.shah24@vit.edu"
+    role: "M2 - Data & Signals Engineer"
+  - name: "Asad Sayyed"
+    email: "asad.sayyed24@vit.edu"
+    role: "M3 - Core Modeler"
+  - name: "Tejas Biradar"
+    email: "biradartejas842@gmail.com"
+    role: "M4 - Infrastructure & Sandbox Engineer"
+
+github_repo: "https://github.com/Tejas1234-biradar/IndiaRuns.git"
+sandbox_link: "https://indiarunsgit-jrx6bmjgbyclixxtcd27hl.streamlit.app/"
+reproduce_command: "python rank.py --candidates ./data/candidates.jsonl --artifacts ./artifacts --out ./submission.csv"
+
+compute:
+  platform: "Local Linux workstation / Docker CPU runtime"
+  cpu_cores: 16
+  ram_gb: 24
+  python_version: "3.12.13"
+  os: "Linux 7.0.13-arch1-2"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: true
+  pre_computation_time_minutes: 0.01
+
+ai_tools_used:
+  - "GitHub Copilot"
+  - "Cursor"
+  - "OpenCode"
+
+ai_usage_summary: |
+  Used GitHub Copilot, Cursor, and OpenCode for coding assistance, debugging,
+  refactoring, and architecture iteration. The final ranking pipeline performs
+  no external API calls during inference. Runtime ranking executes locally in a
+  constrained CPU-only environment using precomputed artifacts and deterministic
+  model-based reasoning.
+
+methodology_summary: |
+  Two-phase candidate ranking system.
+
+  Offline phase: decode and structure the JD, build semantic candidate embeddings and a FAISS index,
+  engineer tabular behavioral/profile features, detect honeypots, and train an XGBoost ranker on
+  teacher-labeled relevance scores.
+
+  Runtime phase: load precomputed artifacts, purge honeypots, retrieve a top semantic slice with
+  FAISS, load only the selected tabular feature rows, score candidates with the XGBoost student
+  ranker, and generate deterministic SHAP-based reasoning for the final ranked output. The verified
+  local end-to-end `rank.py` runtime on the current environment was approximately 0.43 seconds for
+  the full submission flow, and the project also includes a lightweight Streamlit sandbox for
+  manual inspection on candidate slices up to 100 rows.
+
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true
