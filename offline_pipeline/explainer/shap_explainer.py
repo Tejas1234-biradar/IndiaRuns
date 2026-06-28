@@ -30,12 +30,51 @@ class CandidateExplainer:
         """
         Checklist [x]: Initialize TreeExplainer module with model.xgb
         """
+        import json
+        
         self.model = xgb.XGBRanker()
         self.model.load_model(model_path)
         
-        # Initialize lightweight TreeExplainer
-        self.explainer = shap.TreeExplainer(self.model)
-    
+        # Extract the underlying C++ Booster object
+        booster = self.model.get_booster()
+        
+        # --- THE CORRECT SHAP/XGBOOST MONKEY PATCH ---
+        # shap.TreeExplainer calls booster.save_raw(raw_format="json") to parse the model.
+        # We must intercept this specific byte stream to fix the base_score string formatting.
+        original_save_raw = booster.save_raw
+        
+        def patched_save_raw(*args, **kwargs):
+            # 1. Get the original bytearray from XGBoost
+            raw_bytes = original_save_raw(*args, **kwargs)
+            
+            # 2. Only intercept if it's a JSON bytearray (starts with '{')
+            if isinstance(raw_bytes, (bytes, bytearray)) and raw_bytes.startswith(b'{'):
+                try:
+                    # Decode bytes to Python dict
+                    model_dict = json.loads(raw_bytes.decode('utf-8'))
+                    
+                    # Navigate down to base_score
+                    base_score = model_dict.get('learner', {}).get('learner_model_param', {}).get('base_score')
+                    
+                    # Strip the brackets if they exist
+                    if isinstance(base_score, str) and base_score.startswith('[') and base_score.endswith(']'):
+                        model_dict['learner']['learner_model_param']['base_score'] = base_score.strip('[]')
+                    
+                    # Re-encode back to bytearray for SHAP
+                    return bytearray(json.dumps(model_dict).encode('utf-8'))
+                except Exception as e:
+                    # Failsafe: return original bytes if parsing fails
+                    pass
+                    
+            return raw_bytes
+            
+        # Apply the patch to this specific instance
+        booster.save_raw = patched_save_raw
+        # ---------------------------------------------
+        
+        # Initialize TreeExplainer safely bypassing the SKLearn wrapper
+        self.explainer = shap.TreeExplainer(booster)
+        
     def get_top_drivers(self, candidates_df: pd.DataFrame) -> list[list[dict]]:
         """
         Compute local SHAP values for the final top 100 rows
