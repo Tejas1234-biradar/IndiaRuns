@@ -26,6 +26,7 @@ from pathlib import Path
 import faiss
 import numpy as np
 import pandas as pd
+import pyarrow.dataset as ds
 import shap
 import xgboost as xgb
 
@@ -121,6 +122,41 @@ def load_features_parquet(path: Path) -> pd.DataFrame:
     print(f"[LOAD] Reading precomputed features from {path} …")
     df = pd.read_parquet(path)
     print(f"  {len(df):,} candidates × {len(df.columns)} columns")
+    return df
+
+
+def load_selected_features_parquet(
+    path: Path,
+    selected_ids: list[str] | set[str],
+) -> pd.DataFrame:
+    """Load only the required model columns for the selected candidate IDs."""
+    ids = sorted(set(selected_ids))
+    if not ids:
+        raise RuntimeError("No selected candidate IDs provided for feature lookup")
+
+    requested_columns = ["candidate_id", *FEATURE_COLUMNS]
+    print(
+        f"[LOAD] Reading precomputed features for {len(ids):,} selected candidates from {path} …"
+    )
+    t0 = time.perf_counter()
+
+    dataset = ds.dataset(str(path), format="parquet")
+    table = dataset.to_table(
+        columns=requested_columns,
+        filter=ds.field("candidate_id").isin(ids),
+    )
+    df = table.to_pandas()
+
+    missing_cols = [col for col in requested_columns if col not in df.columns]
+    if missing_cols:
+        raise RuntimeError(
+            f"Selected feature lookup missing required columns: {missing_cols}"
+        )
+
+    elapsed = time.perf_counter() - t0
+    print(
+        f"  Loaded {len(df):,} selected candidates × {len(df.columns)} columns in {elapsed:.3f}s"
+    )
     return df
 
 
@@ -414,12 +450,58 @@ def normalize_scores(scores: np.ndarray) -> np.ndarray:
     return np.array(out)
 
 
-def write_submission(top: pd.DataFrame, out_path: Path) -> None:
+def validate_submission_frame(top: pd.DataFrame, final_scores: np.ndarray) -> None:
+    """Strict in-process validation for Task 4.6 before writing the CSV."""
     if len(top) != TOP_K:
         raise RuntimeError(f"Expected exactly {TOP_K} ranked rows, found {len(top)}")
 
+    if top["candidate_id"].duplicated().any():
+        dupes = top.loc[top["candidate_id"].duplicated(), "candidate_id"].tolist()
+        raise RuntimeError(f"Duplicate candidate_id values in top-k output: {dupes}")
+
+    invalid_ids = [
+        cid
+        for cid in top["candidate_id"].tolist()
+        if not CANDIDATE_ID_PATTERN.match(str(cid))
+    ]
+    if invalid_ids:
+        raise RuntimeError(f"Invalid candidate_id values in output: {invalid_ids[:5]}")
+
+    expected_ranks = list(range(1, TOP_K + 1))
+    actual_ranks = top["rank"].astype(int).tolist()
+    if actual_ranks != expected_ranks:
+        raise RuntimeError(
+            f"Ranks must be exactly 1..{TOP_K}; found {actual_ranks[:10]}..."
+        )
+
+    expected_order = top.sort_values(
+        ["model_score", "candidate_id"],
+        ascending=[False, True],
+        kind="mergesort",
+    )["candidate_id"].tolist()
+    actual_order = top["candidate_id"].tolist()
+    if actual_order != expected_order:
+        raise RuntimeError(
+            "Top-k rows are not sorted by model_score descending with candidate_id ascending as tie-breaker"
+        )
+
+    if len(final_scores) != TOP_K:
+        raise RuntimeError(
+            f"Expected {TOP_K} normalized scores, found {len(final_scores)}"
+        )
+
+    for i in range(len(final_scores) - 1):
+        if not float(final_scores[i]) > float(final_scores[i + 1]):
+            raise RuntimeError(
+                "Normalized scores must be strictly decreasing; "
+                f"rank {i + 1} score {final_scores[i]} <= rank {i + 2} score {final_scores[i + 1]}"
+            )
+
+
+def write_submission(top: pd.DataFrame, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     scores = normalize_scores(top["model_score"].to_numpy())
+    validate_submission_frame(top, scores)
 
     with out_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh)
@@ -503,8 +585,7 @@ def rank_candidates(
     selected_ids = set(ranked_ids)
 
     if features_path.exists():
-        df = load_features_parquet(features_path)
-        df = df[df["candidate_id"].isin(selected_ids)].copy()
+        df = load_selected_features_parquet(features_path, ranked_ids)
         df = df[~df["candidate_id"].isin(honeypots)].copy()
         df = refresh_faiss_column(df, similarity_map)
         print(
