@@ -69,6 +69,10 @@ if run:
         c3.metric("Honeypots removed", len(metadata["honeypot_candidates"]))
 
         st.success(f"Completed sandbox run for `{source_name}`")
+        if metadata.get("similarity_source") == "precomputed_feature_store":
+            st.warning(
+                "Running in lightweight cloud mode: live FAISS artifacts are not present, so the app is using precomputed `faiss_distance_to_jd` values from `features.parquet`."
+            )
         if metadata["missing_candidates"]:
             st.warning(
                 "Some candidate IDs were not found in the precomputed artifacts: "
