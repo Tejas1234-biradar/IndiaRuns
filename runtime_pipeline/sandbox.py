@@ -167,7 +167,10 @@ def rank_candidate_slice(
     ranker = load_ranker(model_path)
     scored = score_candidates(df, ranker)
     top = select_top_k(scored, k=min(MAX_SANDBOX_CANDIDATES, len(scored)))
-    top = attach_reasoning(top, ranker)
+    raw_candidates_path = Path("data/candidates.jsonl")
+    top = attach_reasoning(
+        top, ranker, raw_candidates_path if raw_candidates_path.exists() else None
+    )
     final_scores = normalize_scores(top["model_score"].to_numpy())
 
     result = top[["candidate_id", "rank", "reasoning"]].copy()
