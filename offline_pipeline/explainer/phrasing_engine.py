@@ -120,3 +120,29 @@ def generate_justification(candidate_row: dict, top_drivers: list[dict]) -> str:
 
     # Capitalize first letter strictly
     return justification[0].upper() + justification[1:]
+
+if __name__ == "__main__":
+    import pandas as pd
+    from shap_explainer import CandidateExplainer
+    
+    print("Initializing SHAP Explainer and Phrasing Engine Audit...")
+    
+    # Load dependencies
+    explainer = CandidateExplainer("artifacts/model.xgb")
+    df = pd.read_parquet("training_dataset.parquet")
+    
+    # Sort by a target proxy to get a mix of good/bad candidates
+    df = df.sort_values(by="years_of_experience", ascending=False).head(5)
+    
+    # Extract drivers via SHAP
+    all_drivers = explainer.get_top_drivers(df)
+    
+    # Conduct manual string variance audits across sample outputs
+    print("\n--- STRING VARIANCE AUDIT ---")
+    for idx, (_, row) in enumerate(df.iterrows()):
+        drivers = all_drivers[idx]
+        row_dict = row.to_dict()
+        
+        justification = generate_justification(row_dict, drivers)
+        print(f"Candidate {idx+1}:")
+        print(f"  {justification}\n")
