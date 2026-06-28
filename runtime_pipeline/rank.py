@@ -67,22 +67,57 @@ def load_faiss_similarity(
     index_path: Path,
     jd_vector_path: Path,
     candidate_ids_path: Path,
+    top_k: int = 2000,
 ) -> dict[str, float]:
-    """Compute JD cosine similarity for every indexed candidate."""
-    print(f"[FAISS] Loading index from {index_path} …")
-    index = faiss.read_index(str(index_path))
-    jd_vector = np.load(jd_vector_path).astype(np.float32).reshape(1, -1)
+    """Compute JD cosine similarity for top-K indexed candidates."""
+    import time
+    
+    t0 = time.perf_counter()
 
-    with candidate_ids_path.open(encoding="utf-8") as fh:
-        candidate_ids: list[str] = json.load(fh)
+    try:
+        print(f"[FAISS] Loading index from {index_path} …")
+        index = faiss.read_index(str(index_path))
+    except Exception as e:
+        raise RuntimeError(f"Failed to load FAISS index. File may be corrupted. Error: {e}")
 
-    print(f"[FAISS] Searching {index.ntotal:,} vectors …")
-    distances, indices = index.search(jd_vector, k=index.ntotal)
+    try:
+        jd_vector = np.load(jd_vector_path).astype(np.float32).reshape(1, -1)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load JD vector. Error: {e}")
 
-    return {
-        candidate_ids[int(faiss_id)]: float(score)
-        for faiss_id, score in zip(indices[0], distances[0])
-    }
+    try:
+        with candidate_ids_path.open(encoding="utf-8") as fh:
+            candidate_ids: list[str] = json.load(fh)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load candidate IDs mapping. Error: {e}")
+
+    # Prevent out-of-bounds requests if index has fewer than 2000 vectors
+    k = min(top_k, index.ntotal)
+    print(f"[FAISS] Searching {index.ntotal:,} vectors for top {k} …")
+    
+    try:
+        distances, indices = index.search(jd_vector, k=k)
+    except Exception as e:
+        raise RuntimeError(f"FAISS search execution failed. Error: {e}")
+
+    similarity_map = {}
+    for faiss_id, score in zip(indices[0], distances[0]):
+        # Boundary validation: verify retrieved index IDs map cleanly
+        if faiss_id < 0 or faiss_id >= len(candidate_ids):
+            print(f"  [WARN] FAISS returned out-of-bounds ID: {faiss_id}")
+            continue
+        
+        cid = candidate_ids[int(faiss_id)]
+        similarity_map[cid] = float(score)
+
+    elapsed = time.perf_counter() - t0
+    print(f"[FAISS] Top-{k} retrieval completed in {elapsed:.4f}s")
+    
+    # Benchmark warning if we miss the target window
+    if elapsed > 2.0:
+        print(f"  [WARN] FAISS search exceeded 2.0s target envelope ({elapsed:.2f}s)")
+
+    return similarity_map
 
 
 def load_features_parquet(path: Path) -> pd.DataFrame:
@@ -127,6 +162,12 @@ def build_features_from_jsonl(
             cid = raw.get("candidate_id")
             if not cid or not CANDIDATE_ID_PATTERN.match(cid):
                 continue
+            
+            # --- NEW FILTER ---
+            if cid not in similarity_map:
+                continue
+            # ------------------
+
             faiss_score = similarity_map.get(cid, 0.0)
             feat = build_features_from_raw(raw, faiss_score)
             feat["candidate_id"] = cid
@@ -261,9 +302,12 @@ def rank_candidates(
         df = load_features_parquet(features_path)
         similarity_map = dict(zip(df["candidate_id"], df["faiss_distance_to_jd"]))
     else:
-        similarity_map = load_faiss_similarity(faiss_path, jd_path, ids_path)
+        # Inside rank_candidates, replace the `else:` block logic for parquet loading:
+        similarity_map = load_faiss_similarity(faiss_path, jd_path, ids_path, top_k=2000)
         if features_path.exists():
             df = load_features_parquet(features_path)
+            # --- NEW FILTER: Shrink DataFrame to only top 2000 ---
+            df = df[df["candidate_id"].isin(similarity_map.keys())].copy()
             df = refresh_faiss_column(df, similarity_map)
         else:
             df = build_features_from_jsonl(
